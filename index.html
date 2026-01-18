@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LibreCall v0.57</title>
+    <title>LibreCall v0.60</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#121212">
@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzEyMTIxMiIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMTgwIiBmaWxsPSIjMDA3YmZmIi8+PHBhdGggZD0iTTI1NiAxNTZsLTQwIDQwIDQwIDQwIDQwLTQwLTQwLTQwem0wIDAgdjgwIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=">
 
     <style>
-        /* --- CORE --- */
+        /* --- CORE STYLES (Restored from v0.53) --- */
         body {
             background-color: #121212; color: #e0e0e0;
             font-family: 'Segoe UI', system-ui, sans-serif;
@@ -25,14 +25,14 @@
             margin: 15px 0; font-weight: 200; font-size: 2.2rem;
             background: linear-gradient(45deg, #fff, #bbb);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            text-align: center;
+            display: flex; align-items: baseline; justify-content: center; gap: 10px;
         }
         .version-tag { 
-            font-size: 0.4em; -webkit-text-fill-color: #666; font-weight: 400;
-            vertical-align: super; margin-left: 5px;
+            font-size: 0.4em; -webkit-text-fill-color: #666; 
+            font-weight: 400; transform: translateY(-2px);
         }
 
-        /* --- CONTROLS --- */
+        /* --- WIZARD CONTROLS --- */
         .controls {
             background: #1e1e1e; padding: 20px;
             border-radius: 16px; width: 95%; max-width: 600px;
@@ -95,6 +95,7 @@
         .btn-red { background: #dc3545; }
         .btn-grey { background: #444; }
 
+        /* --- CHAT --- */
         #chatLog {
             height: 120px; background: #000;
             border: 1px solid #333; border-radius: 8px;
@@ -110,6 +111,7 @@
         .chat-row { display: flex; gap: 8px; }
         .chat-input { flex: 1; padding: 10px; background: #222; border: 1px solid #444; color: #fff; border-radius: 6px; }
 
+        /* --- MEDIA BUTTONS --- */
         .media-row { display: flex; gap: 10px; margin-top: 10px; }
         .media-btn { 
             flex: 1; height: 50px; border-radius: 8px; border: none; 
@@ -120,14 +122,16 @@
         .media-on { background: #333; }
         .media-off { background: #d32f2f; }
 
+        /* --- VIDEO STAGE --- */
         .video-stage {
             position: relative; width: 95%; max-width: 800px;
             aspect-ratio: 16/9; background: #000;
             border-radius: 16px; border: 1px solid #333;
             overflow: hidden; display: flex; align-items: center; justify-content: center;
-            margin-bottom: 20px; display: none; 
+            margin-bottom: 20px; display: none; /* Auto-hide logic */
         }
         .video-stage.visible { display: flex; }
+        
         .placeholder { position: absolute; color: #444; font-weight: 500; }
         .main-view { width: 100%; height: 100%; object-fit: cover; position: absolute; z-index: 1; }
         .pip-view { 
@@ -152,19 +156,24 @@
         document.querySelector('link[rel="manifest"]').href = URL.createObjectURL(new Blob([JSON.stringify(m)],{type:'application/json'}));
     </script>
 
-    <h1>LibreCall<span class="version-tag">v0.57</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.60</span></h1>
 
     <div class="controls">
+        
         <div id="modeSelector" class="mode-selector">
-            <button class="mode-btn" onclick="selectMode('host')">START CALL <span>(Send Invite)</span></button>
-            <button class="mode-btn" onclick="selectMode('join')">JOIN CALL <span>(Accept Invite)</span></button>
+            <button class="mode-btn" onclick="selectMode('host')">
+                START CALL <span>(Send Invite)</span>
+            </button>
+            <button class="mode-btn" onclick="selectMode('join')">
+                JOIN CALL <span>(Accept Invite)</span>
+            </button>
         </div>
 
         <div id="hostPanel" class="panel">
             <div class="step-box step-active">
                 <div class="step-title">Step 1: Send Invitation</div>
                 <div class="input-group">
-                    <textarea id="hostOffer" class="code-box" readonly placeholder="Generating..."></textarea>
+                    <textarea id="hostOffer" class="code-box" readonly placeholder="Wait... Gathering Network..."></textarea>
                     <button class="side-btn" onclick="copyToClip('hostOffer')">COPY</button>
                 </div>
             </div>
@@ -219,7 +228,12 @@
     </div>
 
     <script>
-        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        // CONFIG: 3 Google STUN servers for reliability
+        const config = { iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" },
+            { urls: "stun:stun2.l.google.com:19302" }
+        ]};
         const el = id => document.getElementById(id);
         const ICONS = {
             camOn: '<svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>',
@@ -230,8 +244,8 @@
 
         let pc, dc, localStream, isHost = false, isConnected = false; 
         let iceComplete = false; 
-        let wakeLock = null;
 
+        // --- COMPRESSION HELPERS (GZIP) ---
         async function compress(str) {
             const stream = new Blob([str]).stream().pipeThrough(new CompressionStream("gzip"));
             return btoa(String.fromCharCode(...new Uint8Array(await new Response(stream).arrayBuffer())));
@@ -243,10 +257,7 @@
             return await new Response(stream).text();
         }
 
-        async function requestWakeLock() {
-            try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
-        }
-
+        // --- WIZARD UI LOGIC ---
         function selectMode(mode) {
             el('modeSelector').style.display = 'none';
             if (mode === 'host') {
@@ -256,13 +267,12 @@
                 dc = pc.createDataChannel("chat");
                 setupDC(dc);
                 pc.createOffer().then(d => pc.setLocalDescription(d));
-                log("Generating Invitation...", 'sys');
+                log("Gathering Network Info...", 'sys');
             } else {
                 isHost = false;
                 el('joinPanel').classList.add('visible');
                 log("Waiting for Invite Code...", 'sys');
             }
-            requestWakeLock();
         }
 
         function resetApp() {
@@ -275,7 +285,6 @@
             el('joinStep2').style.pointerEvents = 'none';
             el('hostAnswer').classList.remove('error');
             el('joinOffer').classList.remove('error');
-            if(wakeLock) { wakeLock.release(); wakeLock = null; }
         }
 
         async function hostConnect() {
@@ -303,9 +312,11 @@
                 await pc.setRemoteDescription(JSON.parse(json));
                 const ans = await pc.createAnswer();
                 await pc.setLocalDescription(ans);
+                log("Gathering Network Info...", 'sys');
             } catch(e) { log("Invalid Invite Code", 'sys'); }
         }
 
+        // --- WEBRTC CORE (SMART TIMEOUT) ---
         function createPC() {
             pc = new RTCPeerConnection(config);
             localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
@@ -314,16 +325,16 @@
             iceComplete = false;
             pc.onicecandidate = e => { if (!e.candidate) finalizeIce(); };
             
+            // SMART WAIT: 2 seconds to find public IP via STUN
             setTimeout(() => {
                 if (!iceComplete && pc && pc.localDescription) {
-                    log("Network slow. Forcing generation...", 'sys');
+                    // Force generation if STUN is slow
                     finalizeIce();
                 }
-            }, 4000); 
+            }, 2000); 
             
             pc.onconnectionstatechange = () => {
                 if (pc.connectionState === 'connected') setConnected(true);
-                // FIX: Only failed/closed triggers disconnect. 'disconnected' is ignored (temp glitch)
                 if (pc.connectionState === 'failed' || pc.connectionState === 'closed') doDisconnect(false, "Connection Lost");
             };
         }
@@ -331,19 +342,20 @@
         async function finalizeIce() {
             if (iceComplete) return;
             iceComplete = true;
+            
             const json = JSON.stringify(pc.localDescription);
             const code = await compress(json);
             
             if (isHost) {
                 el('hostOffer').value = code;
-                log("Invitation Generated!", 'sys');
+                log("Invitation Ready!", 'sys');
             } else {
                 el('joinAnswer').value = code;
                 el('joinStep2').style.opacity = '1';
                 el('joinStep2').style.pointerEvents = 'all';
                 el('btnJoinGen').disabled = true;
                 el('btnJoinGen').innerText = "DONE";
-                log("Confirmation Generated!", 'sys');
+                log("Confirmation Ready!", 'sys');
             }
         }
 
@@ -351,13 +363,14 @@
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
                 el('localVideo').srcObject = localStream;
-                localStream.getAudioTracks()[0].enabled = true;
-                localStream.getVideoTracks()[0].enabled = false;
+                localStream.getAudioTracks()[0].enabled = true; // Mic ON
+                localStream.getVideoTracks()[0].enabled = false; // Cam OFF
                 updateMediaUI();
                 log("Devices Ready.", 'sys');
             } catch(e) { log("Camera/Mic blocked.", 'sys'); }
         }
 
+        // --- REST OF LOGIC ---
         function setupDC(channel) {
             dc = channel;
             dc.onopen = () => { log("Connected!", 'sys'); setConnected(true); };
@@ -393,25 +406,23 @@
             pc = null; dc = null;
             setConnected(false);
             log(reason, 'sys');
-            if(wakeLock) { wakeLock.release(); wakeLock = null; }
         }
 
         async function validateInput(elem) {
             const str = elem.value.trim();
             let isValid = false;
             try { 
-                const json = await decompress(str);
-                const j = JSON.parse(json); 
-                if (j.type && j.sdp) isValid = true; 
+                await decompress(str); 
+                isValid = true; 
             } catch(e){}
             
             if (str.length > 0 && !isValid) {
                 elem.classList.add('error');
                 if(elem.id === 'hostAnswer') el('btnHostConnect').disabled = true;
-                return false;
+            } else {
+                elem.classList.remove('error');
+                if(elem.id === 'hostAnswer') el('btnHostConnect').disabled = !isValid;
             }
-            elem.classList.remove('error');
-            if(elem.id === 'hostAnswer' && isValid) el('btnHostConnect').disabled = false;
             return isValid;
         }
 
