@@ -2,12 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LibreCall v0.70 (Auto)</title>
+    <title>LibreCall v0.77 (Soft UI)</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#121212">
-    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzEyMTIxMiIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMTgwIiBmaWxsPSIjMDA3YmZmIi8+PHBhdGggZD0iTTI1NiAxNTZsLTQwIDQwIDQwIDQwIDQwLTQwLTQwLTQwem0wIDAgdjgwIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=">
-
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
     <style>
@@ -22,13 +20,16 @@
         }
 
         h1 { 
-            margin: 15px 0; font-weight: 200; font-size: 2.2rem;
+            margin: 15px 0; 
+            font-weight: 600; 
+            font-size: 2.2rem;
             background: linear-gradient(45deg, #00ff9d, #00bfff);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             display: flex; align-items: baseline; justify-content: center; gap: 10px;
         }
         .version-tag { 
-            font-size: 0.4em; -webkit-text-fill-color: #666; 
+            font-size: 0.4em; 
+            -webkit-text-fill-color: rgba(255,255,255,0.8); 
             font-weight: 400; transform: translateY(-2px);
         }
 
@@ -42,7 +43,6 @@
             transition: all 0.3s ease;
         }
 
-        /* Tabs for Auto vs Manual */
         .tab-bar { display: flex; gap: 5px; background: #111; padding: 4px; border-radius: 8px; margin-bottom: 10px; }
         .tab-btn {
             flex: 1; padding: 10px; border: none; background: transparent; color: #888;
@@ -83,12 +83,16 @@
             box-sizing: border-box; resize: none;
         }
         textarea.code-box:focus { outline: none; border-color: #007bff; }
+        
         input.room-input {
-            width: 100%; padding: 15px; font-size: 24px; text-align: center;
+            flex-grow: 1; 
+            padding: 10px; font-size: 24px; text-align: center;
             background: #111; border: 2px solid #444; color: #fff; border-radius: 8px;
-            letter-spacing: 5px; font-family: monospace; text-transform: uppercase;
+            letter-spacing: 3px; font-family: monospace; text-transform: uppercase;
+            height: 54px; box-sizing: border-box;
         }
         input.room-input:focus { outline: none; border-color: #007bff; }
+        input.room-input[readonly] { background: #1a1a1a; color: #00ff9d; border-color: #00ff9d; cursor: not-allowed; }
 
         button.action-btn {
             width: 100%; padding: 12px; border: none; border-radius: 8px;
@@ -97,15 +101,34 @@
         button.action-btn:disabled { background: #333 !important; color: #666; cursor: not-allowed; }
         
         button.side-btn {
-            width: 110px; padding: 0; border: none; border-radius: 6px;
-            background: #444; color: #fff; font-size: 11px; font-weight: bold;
+            width: 90px; padding: 0; border: none; border-radius: 6px;
+            background: #444; color: #fff; font-size: 14px; font-weight: bold;
             cursor: pointer; text-transform: uppercase;
+            display: flex; align-items: center; justify-content: center;
+            height: 54px; 
         }
+        button.side-btn:hover { background: #555; }
+        button.side-btn:active { transform: scale(0.98); }
         
         .btn-blue { background: #007bff; }
         .btn-green { background: #28a745; }
-        .btn-red { background: #dc3545; }
+        
+        /* UPDATED RED BUTTON STYLE */
+        .btn-red { 
+            background: #a63a3a; /* Soft Burgundy/Brick Red */
+            transition: background 0.2s;
+        }
+        .btn-red:hover { background: #c04040; }
+        
         .btn-grey { background: #444; }
+
+        /* SPECIFIC DISCONNECT BUTTON STYLE */
+        #btnDisconnect {
+            height: 60px; /* Taller */
+            font-size: 18px; /* Larger Text */
+            margin-bottom: 10px; /* Spacing */
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
 
         #chatLog {
             height: 120px; background: #000;
@@ -113,8 +136,8 @@
             overflow-y: auto; padding: 10px; font-family: monospace; font-size: 12px;
         }
         .msg-sys { color: #ff4444; font-weight: bold; }
-        .msg-me { color: #4caf50; }
-        .msg-peer { color: #00bfff; }
+        .msg-me { color: #28a745; font-weight: bold;}
+        .msg-peer { color: #00bfff; font-weight: bold;}
 
         .chat-row { display: flex; gap: 8px; }
         .chat-input { flex: 1; padding: 10px; background: #222; border: 1px solid #444; color: #fff; border-radius: 6px; }
@@ -126,7 +149,7 @@
             transition: background 0.2s;
         }
         .media-btn svg { width: 24px; fill: #fff; }
-        .media-on { background: #333; }
+        .media-on { background: #28a745; }
         .media-off { background: #d32f2f; }
 
         .video-stage {
@@ -149,17 +172,18 @@
         body.connected .controls > :not(#chatLog, .chat-row, .media-row, #btnDisconnect) { display: none !important; }
         body.connected .controls { width: 95%; }
         
-        .mqtt-status { font-size: 11px; text-align: center; color: #666; margin-top: 5px; }
+        .mqtt-status { 
+            font-size: 14px; text-align: center; color: #00bfff; 
+            margin-top: 10px; font-weight: 600; animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
 
-    <script>
-        const m={name:"LibreCall",display:"standalone",background_color:"#121212",theme_color:"#121212",icons:[{src:"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzEyMTIxMiIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMTgwIiBmaWxsPSIjMDA3YmZmIi8+PHBhdGggZD0iTTI1NiAxNTZsLTQwIDQwIDQwIDQwIDQwLTQwLTQwLTQwem0wIDAgdjgwIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=",sizes:"512x512",type:"image/svg+xml"}]};
-        document.querySelector('link[rel="manifest"]').href = URL.createObjectURL(new Blob([JSON.stringify(m)],{type:'application/json'}));
-    </script>
-
-    <h1>LibreCall<span class="version-tag">v0.70</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.77</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -176,7 +200,11 @@
             <div id="autoPanel" class="panel">
                 <div class="step-box step-active">
                     <div class="step-title" id="autoTitle">Room Code</div>
-                    <input id="roomCode" class="room-input" placeholder="____" maxlength="6" oninput="this.value=this.value.toUpperCase()">
+                    <div class="input-group">
+                        <input id="roomCode" class="room-input" placeholder="____" maxlength="6" oninput="this.value=this.value.toUpperCase()">
+                        <button id="btnCopy" class="side-btn" style="display:none" onclick="copyToClip('roomCode')">COPY</button>
+                        <button id="btnPaste" class="side-btn" style="display:none" onclick="pasteToField('roomCode')">PASTE</button>
+                    </div>
                     <div id="mqttStatus" class="mqtt-status">Not connected</div>
                     <button id="btnAutoConnect" class="action-btn btn-green" style="margin-top:10px; display:none" onclick="connectMQTT()">CONNECT</button>
                 </div>
@@ -189,7 +217,6 @@
                 <button class="mode-btn" onclick="selectManual('host')">START CALL <span>(Send Invite)</span></button>
                 <button class="mode-btn" onclick="selectManual('join')">JOIN CALL <span>(Accept Invite)</span></button>
             </div>
-
             <div id="hostPanel" class="panel">
                 <div class="step-box step-active">
                     <div class="step-title">Step 1: Send Invitation</div>
@@ -208,7 +235,6 @@
                 </div>
                 <button class="action-btn btn-grey" onclick="resetApp()">CANCEL</button>
             </div>
-
             <div id="joinPanel" class="panel">
                 <div class="step-box step-wait">
                     <div class="step-title">Step 1: Paste Invitation</div>
@@ -234,7 +260,7 @@
         <div id="chatLog"></div>
         <div class="chat-row">
             <input id="chatInput" class="chat-input" placeholder="Message..." disabled onkeypress="if(event.key==='Enter') doSend()">
-            <button id="btnSend" class="action-btn btn-blue" style="width:auto;" onclick="doSend()" disabled>></button>
+            <button id="btnSend" class="action-btn btn-blue" style="width:80px;" onclick="doSend()" disabled>SEND</button>
         </div>
 
         <div class="media-row">
@@ -250,9 +276,8 @@
     </div>
 
     <script>
-        // CONFIG
         const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
-        const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt"; // Public Broker over SSL
+        const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt"; 
 
         const el = id => document.getElementById(id);
         const ICONS = {
@@ -267,7 +292,7 @@
         let iceComplete = false, wakeLock = null;
         let currentRoom = "";
 
-        // --- COMPRESSION HELPERS ---
+        // --- HELPERS ---
         async function compress(str) {
             const stream = new Blob([str]).stream().pipeThrough(new CompressionStream("gzip"));
             return btoa(String.fromCharCode(...new Uint8Array(await new Response(stream).arrayBuffer())));
@@ -279,10 +304,10 @@
             return await new Response(stream).text();
         }
 
-        // --- UI NAVIGATION ---
+        // --- UI ---
         function switchTab(tab) {
             if(isConnected) return;
-            resetApp();
+            resetApp("Switched mode");
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
             
@@ -295,107 +320,98 @@
             }
         }
 
-        function resetApp() {
-            doDisconnect(false, "Reset.");
+        function resetApp(reason="Reset") {
+            doDisconnect(false, reason);
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('visible'));
             document.querySelectorAll('.mode-selector').forEach(m => m.style.display = 'flex');
-            
-            // Clean inputs
             ['hostOffer','hostAnswer','joinOffer','joinAnswer','roomCode'].forEach(i => { if(el(i)) el(i).value = ''; });
             el('mqttStatus').innerText = "Not connected";
             el('joinStep2').style.opacity = '0.5';
-            
-            if(mqClient) { mqClient.end(); mqClient = null; }
+            el('btnCopy').style.display = 'none';
+            el('btnPaste').style.display = 'none';
+            if(mqClient) { mqClient.end(); mqClient = null; log("MQTT Disconnected.", 'sys'); }
             if(wakeLock) { wakeLock.release(); wakeLock = null; }
         }
 
-        // --- AUTO MODE (MQTT) ---
+        // --- AUTO MODE ---
         function startAuto(role) {
             isAuto = true;
             isHost = (role === 'host');
-            
             el('uiAuto').querySelector('.mode-selector').style.display = 'none';
             el('autoPanel').classList.add('visible');
             requestWakeLock();
 
             if(isHost) {
-                // Generate random room code
                 currentRoom = Math.random().toString(36).substring(2, 6).toUpperCase();
                 el('roomCode').value = currentRoom;
                 el('roomCode').readOnly = true;
                 el('autoTitle').innerText = "Share this Code";
                 el('btnAutoConnect').style.display = 'none';
-                connectMQTT(); // Host connects immediately
+                el('btnCopy').style.display = 'block';
+                el('btnPaste').style.display = 'none';
+                log(`Starting as HOST. Room: ${currentRoom}.`, 'sys');
+                connectMQTT(); 
             } else {
                 el('roomCode').value = "";
                 el('roomCode').readOnly = false;
                 el('autoTitle').innerText = "Enter Host Code";
                 el('btnAutoConnect').style.display = 'block';
+                el('btnCopy').style.display = 'none';
+                el('btnPaste').style.display = 'block';
+                log("Selected JOIN. Waiting for code...", 'sys');
             }
         }
 
         function connectMQTT() {
             if(!isHost) currentRoom = el('roomCode').value.toUpperCase().trim();
             if(currentRoom.length < 3) return alert("Invalid Code");
-            
             if(!isHost) {
                 el('btnAutoConnect').disabled = true;
                 el('btnAutoConnect').innerText = "CONNECTING...";
             }
-
-            el('mqttStatus').innerText = "Connecting to public network...";
+            el('mqttStatus').innerText = "Network Connected. Waiting for peer...";
             
             const clientId = 'lc_' + Math.random().toString(16).substr(2, 8);
             mqClient = mqtt.connect(MQTT_BROKER, { clientId: clientId });
 
             mqClient.on('connect', () => {
-                el('mqttStatus').innerText = "Network Connected. Waiting for peer...";
-                // Subscribe to our specific role channel
+                log("MQTT Connected.", 'sys');
                 const topic = `librecall/v1/${currentRoom}/${isHost ? 'host' : 'guest'}`;
                 mqClient.subscribe(topic);
-                
-                // If Guest, announce presence
-                if(!isHost) {
-                    publishSig('join', {});
-                    createPC(); // Prepare PC
-                }
+                if(!isHost) { publishSig('join', {}); createPC(); }
             });
 
             mqClient.on('message', async (topic, message) => {
                 const msg = JSON.parse(message.toString());
-                if(msg.sender === clientId) return; // Ignore self
-
-                log(`Sig: ${msg.type}`, 'sys');
+                if(msg.sender === clientId) return; 
 
                 if(msg.type === 'join' && isHost) {
-                    // Guest is here. Start Host process.
+                    el('mqttStatus').innerText = "Peer found! Initializing...";
                     createPC();
                     dc = pc.createDataChannel("chat");
                     setupDC(dc);
                     const offer = await pc.createOffer();
                     await pc.setLocalDescription(offer);
-                    // Wait for ICE gathering in createPC to trigger finalizeIce -> publishSig
                 }
-                
                 if(msg.type === 'offer' && !isHost) {
+                    el('mqttStatus').innerText = "Connecting secure tunnel...";
                     if(!pc) createPC();
                     await pc.setRemoteDescription(msg.data);
                     const answer = await pc.createAnswer();
                     await pc.setLocalDescription(answer);
-                    // ICE will trigger finalizeIce -> publishSig('answer')
                 }
-
-                if(msg.type === 'answer' && isHost) {
-                    await pc.setRemoteDescription(msg.data);
-                }
+                if(msg.type === 'answer' && isHost) await pc.setRemoteDescription(msg.data);
             });
+             mqClient.on('error', (err) => {
+                 log("MQTT Error: " + err.message, 'sys');
+                 el('mqttStatus').innerText = "Network Error.";
+                 el('mqttStatus').style.color = "#dc3545";
+             });
         }
 
         function publishSig(type, data) {
-            // Send to the OTHER person's topic
             const targetTopic = `librecall/v1/${currentRoom}/${isHost ? 'guest' : 'host'}`;
-            const payload = JSON.stringify({ type: type, data: data, sender: mqClient.options.clientId });
-            mqClient.publish(targetTopic, payload);
+            mqClient.publish(targetTopic, JSON.stringify({ type: type, data: data, sender: mqClient.options.clientId }));
         }
 
         // --- MANUAL MODE ---
@@ -417,17 +433,14 @@
         }
 
         async function hostConnectManual() {
-            const code = el('hostAnswer').value.trim();
             try {
-                const json = await decompress(code);
+                const json = await decompress(el('hostAnswer').value.trim());
                 pc.setRemoteDescription(JSON.parse(json));
-                log("Manual connection accepted.", 'sys');
             } catch(e) { log("Error: Bad code", 'sys'); }
         }
 
         async function joinGenerate() {
             createPC();
-            pc.ondatachannel = e => setupDC(e.channel);
             try {
                 const json = await decompress(el('joinOffer').value.trim());
                 await pc.setRemoteDescription(JSON.parse(json));
@@ -436,12 +449,17 @@
             } catch(e) { log("Invalid Code", 'sys'); }
         }
 
-        // --- WEBRTC CORE ---
+        // --- WEBRTC ---
         function createPC() {
-            if(pc) return; // Prevent duplicates
+            if(pc) return;
             pc = new RTCPeerConnection(config);
             if(localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
             
+            pc.ondatachannel = e => {
+                log("DataChannel received via P2P.", 'sys');
+                setupDC(e.channel);
+            };
+
             pc.ontrack = e => {
                 el('remoteVideo').srcObject = e.streams[0];
                 el('remoteVideo').play().catch(e=>console.log(e));
@@ -449,18 +467,10 @@
             
             iceComplete = false;
             pc.onicecandidate = e => { if (!e.candidate) finalizeIce(); };
-            
-            // Timeout for ICE gathering
-            setTimeout(() => {
-                if (!iceComplete && pc && pc.localDescription) {
-                    log("ICE timeout. Finalizing...", 'sys');
-                    finalizeIce();
-                }
-            }, 3000); 
+            setTimeout(() => { if (!iceComplete && pc && pc.localDescription) finalizeIce(); }, 3000); 
 
             pc.onconnectionstatechange = () => {
                 if (pc.connectionState === 'connected') setConnected(true);
-                if (pc.connectionState === 'failed') log("Connection Failed", 'sys');
             };
         }
 
@@ -468,19 +478,14 @@
             if (iceComplete) return;
             iceComplete = true;
             
-            // For Manual: Compress and show code
-            // For Auto: Publish JSON via MQTT
-            
             if (isAuto) {
                 if(isHost) publishSig('offer', pc.localDescription);
                 else publishSig('answer', pc.localDescription);
-                log("Signaling sent!", 'sys');
             } else {
                 const json = JSON.stringify(pc.localDescription);
                 const code = await compress(json);
-                if (isHost) {
-                    el('hostOffer').value = code;
-                } else {
+                if (isHost) el('hostOffer').value = code;
+                else {
                     el('joinAnswer').value = code;
                     el('joinStep2').style.opacity = '1';
                     el('joinStep2').style.pointerEvents = 'all';
@@ -492,7 +497,7 @@
 
         function setupDC(channel) {
             dc = channel;
-            dc.onopen = () => { log("DataChannel Open", 'sys'); setConnected(true); };
+            dc.onopen = () => { log("Secure Chat Ready.", 'sys'); setConnected(true); };
             dc.onmessage = e => {
                 if(e.data === "SYS:END") doDisconnect(false, "Call ended by peer.");
                 else log(e.data, 'peer');
@@ -509,7 +514,7 @@
                 el('remoteVideo').className = 'main-view';
                 el('localVideo').className = 'pip-view';
                 updateVideoVisibility();
-                if(mqClient) { mqClient.end(); mqClient = null; } // Disconnect signaling after P2P
+                if(mqClient) { mqClient.end(); mqClient = null; }
             } else {
                 document.body.classList.remove('connected');
                 el('btnDisconnect').style.display = 'none';
@@ -528,6 +533,7 @@
                 localStream.getAudioTracks()[0].enabled = true; 
                 localStream.getVideoTracks()[0].enabled = false;
                 updateMediaUI();
+                log("Media Ready. Mic ON, Camera OFF.", 'sys');
             } catch(e) { log("Media Error: " + e.message, 'sys'); }
         }
         
@@ -546,6 +552,7 @@
             const tr = type==='video' ? localStream.getVideoTracks()[0] : localStream.getAudioTracks()[0];
             tr.enabled = !tr.enabled;
             updateMediaUI();
+            log(`${type==='video'?'Video':'Audio'} ${tr.enabled ? 'ON' : 'OFF'}.`, 'sys');
         }
 
         function updateMediaUI() {
@@ -578,30 +585,34 @@
 
         function doSend() {
             const v = el('chatInput').value;
-            if(v && dc?.readyState==='open') { dc.send(v); log(v, 'me'); el('chatInput').value=''; }
+            if(v && dc && dc.readyState==='open') { dc.send(v); log(v, 'me'); el('chatInput').value=''; }
+            else if(v) log("Error: Chat not connected yet.", 'sys');
         }
 
         function log(m, type) {
             const d = document.createElement('div');
-            const c = type === 'me' ? 'me' : (type === 'peer' ? 'peer' : 'sys');
-            const b = type === 'me' ? 'msg-me' : (type === 'peer' ? 'msg-peer' : 'msg-sys');
-            d.innerHTML = `<span style="color:#666">[${new Date().toLocaleTimeString()}]</span> <span class="${c}">${type.toUpperCase()}:</span> <span class="${b}">${m}</span>`;
+            const labelClass = type === 'me' ? 'msg-me' : (type === 'peer' ? 'msg-peer' : 'msg-sys');
+            let msgColor = '#e0e0e0';
+            if (type === 'me') msgColor = '#28a745'; 
+            if (type === 'peer') msgColor = '#00bfff';
+            if (type === 'sys') msgColor = '#ff4444';
+
+            d.innerHTML = `<span style="color:#666">[${new Date().toLocaleTimeString()}]</span> <span class="${labelClass}">${type.toUpperCase()}:</span> <span style="color:${msgColor}">${m}</span>`;
             el('chatLog').append(d); el('chatLog').scrollTop = 9999;
         }
 
-        // Manual mode helpers
-        function copyToClip(id) { el(id).select(); document.execCommand('copy'); }
+        function copyToClip(id) { el(id).select(); document.execCommand('copy'); log("Copied to clipboard.", 'sys'); }
         async function pasteToField(id) {
-            try { el(id).value = await navigator.clipboard.readText(); if(id==='joinOffer') joinCheckOffer(); } catch(e){}
+            try { 
+                const text = await navigator.clipboard.readText();
+                el(id).value = text; 
+                log("Pasted from clipboard.", 'sys');
+                if(id==='joinOffer') joinCheckOffer(); 
+                if(id==='hostAnswer') validateInput(el(id));
+            } catch(e){ log("Paste failed.", 'sys'); }
         }
-        async function validateInput(elem) {
-            try { await decompress(elem.value); el('btnHostConnect').disabled = false; elem.classList.remove('error'); }
-            catch(e) { el('btnHostConnect').disabled = true; elem.classList.add('error'); }
-        }
-        async function joinCheckOffer() {
-            try { await decompress(el('joinOffer').value); el('btnJoinGen').disabled = false; el('joinOffer').classList.remove('error'); }
-            catch(e) { el('btnJoinGen').disabled = true; el('joinOffer').classList.add('error'); }
-        }
+        async function validateInput(elem) { try { await decompress(elem.value); el('btnHostConnect').disabled = false; } catch(e) { el('btnHostConnect').disabled = true; } }
+        async function joinCheckOffer() { try { await decompress(el('joinOffer').value); el('btnJoinGen').disabled = false; } catch(e) { el('btnJoinGen').disabled = true; } }
 
         start();
     </script>
