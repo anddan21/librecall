@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LibreCall v2.1</title>
+    <title>LibreCall v2.2</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#121212">
@@ -279,18 +279,19 @@
             "theme_color": "#121212",
             "orientation": "portrait",
             "icons": [{
-                "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzEyMTIxMiIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMTgwIiBmaWxsPSIjMDA3YmZmIi8+PHBhdGggZD0iTTI1NiAxNTZsLTQwIDQwIDQwIDQwIDQwLTQwLTQwLTQwem0wIDAgdjgwIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=",
-                "sizes": "512x512",
-                "type": "image/svg+xml"
-            }]
-        };
+                "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzEyMTIxMiIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMTgwIiBmaWxsPSIjMDA3YmZmIi8+PHBhdGggZD0iTTI1NiAxNTZsLTQwIDQwIDQwIDQwIDQwLTQwLTQwLTQwem0wIDAgdjgwIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=">
+
+    <link rel="manifest" id="my-manifest-placeholder">
+
+    <script>
+        // Inject Manifest
         const stringManifest = JSON.stringify(manifest);
         const blob = new Blob([stringManifest], {type: 'application/json'});
         const manifestURL = URL.createObjectURL(blob);
         document.querySelector('#my-manifest-placeholder').setAttribute('href', manifestURL);
     </script>
 
-    <h1>LibreCall<span class="version-tag">v2.1</span></h1>
+    <h1>LibreCall<span class="version-tag">v2.2</span></h1>
 
     <div class="videos">
         <video id="localVideo" autoplay playsinline muted></video>
@@ -405,7 +406,7 @@
                 return btoa(String.fromCharCode(...new Uint8Array(buffer)));
             } catch(e) {
                 console.warn("Compression failed, using raw JSON", e);
-                return btoa(string); // Fallback to base64 only
+                return btoa(string);
             }
         }
 
@@ -418,7 +419,6 @@
                     throw new Error("Decompression not supported");
                 }
                 const binaryString = atob(cleanBase64);
-                // Try GZIP first
                 try {
                     const bytes = Uint8Array.from(binaryString, c => c.charCodeAt(0));
                     const stream = new Blob([bytes]).stream();
@@ -426,11 +426,9 @@
                     const decompressedResponse = await new Response(decompressedReadableStream);
                     return await decompressedResponse.text();
                 } catch (gzipErr) {
-                    // If gzip fails, maybe it was simple base64 (fallback)
                     return binaryString;
                 }
             } catch(e) {
-                 // Absolute fallback
                  return atob(cleanBase64);
             }
         }
@@ -494,7 +492,7 @@
         }
 
         async function finalizeCodeGeneration() {
-            if (offerGenerated) return; // Prevent double run
+            if (offerGenerated) return;
             offerGenerated = true;
 
             let sdp = peerConnection.localDescription.sdp;
@@ -527,7 +525,7 @@
                 }
             };
 
-            offerGenerated = false; // Reset flag
+            offerGenerated = false;
 
             peerConnection.onicecandidate = async (event) => {
                 if (event.candidate === null) {
@@ -535,7 +533,6 @@
                 }
             };
 
-            // FAILSAFE: If ICE gathering is stuck (slow network), force generation after 2s
             setTimeout(() => {
                 if (!offerGenerated && peerConnection.iceGatheringState !== 'complete') {
                     log("Network slow. Forcing code generation...", 'system');
@@ -548,7 +545,7 @@
             channel.onopen = () => {
                 log("Connection established. Happy LibreCall!", 'system');
                 chatInput.disabled = false;
-                chatInput.focus();
+                // FIX: Removed auto-focus to prevent keyboard popup
                 setConnectedState(true);
             };
             channel.onmessage = (event) => {
@@ -565,6 +562,9 @@
             const action = btnMain.innerText;
             
             if (action === "CREATE OFFER") {
+                // FIX: Immediately disable button to prevent double clicks
+                btnMain.disabled = true;
+                btnMain.innerText = "GENERATING...";
                 await createOffer();
             } 
             else if (action === "GENERATE ANSWER") {
@@ -666,6 +666,7 @@
 
             if (remoteVal.length === 0) {
                 if (localVal.length === 0) {
+                    // Reset text if disconnected or new session
                     btnMain.innerText = "CREATE OFFER";
                     btnMain.className = "std-btn btn-blue";
                     btnMain.disabled = false;
