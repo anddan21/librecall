@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LibreCall v0.60</title>
+    <title>LibreCall v0.61</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#121212">
@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzEyMTIxMiIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMTgwIiBmaWxsPSIjMDA3YmZmIi8+PHBhdGggZD0iTTI1NiAxNTZsLTQwIDQwIDQwIDQwIDQwLTQwLTQwLTQwem0wIDAgdjgwIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=">
 
     <style>
-        /* --- CORE STYLES (Restored from v0.53) --- */
+        /* --- CORE --- */
         body {
             background-color: #121212; color: #e0e0e0;
             font-family: 'Segoe UI', system-ui, sans-serif;
@@ -32,7 +32,7 @@
             font-weight: 400; transform: translateY(-2px);
         }
 
-        /* --- WIZARD CONTROLS --- */
+        /* --- CONTROLS --- */
         .controls {
             background: #1e1e1e; padding: 20px;
             border-radius: 16px; width: 95%; max-width: 600px;
@@ -95,7 +95,6 @@
         .btn-red { background: #dc3545; }
         .btn-grey { background: #444; }
 
-        /* --- CHAT --- */
         #chatLog {
             height: 120px; background: #000;
             border: 1px solid #333; border-radius: 8px;
@@ -111,7 +110,6 @@
         .chat-row { display: flex; gap: 8px; }
         .chat-input { flex: 1; padding: 10px; background: #222; border: 1px solid #444; color: #fff; border-radius: 6px; }
 
-        /* --- MEDIA BUTTONS --- */
         .media-row { display: flex; gap: 10px; margin-top: 10px; }
         .media-btn { 
             flex: 1; height: 50px; border-radius: 8px; border: none; 
@@ -122,16 +120,14 @@
         .media-on { background: #333; }
         .media-off { background: #d32f2f; }
 
-        /* --- VIDEO STAGE --- */
         .video-stage {
             position: relative; width: 95%; max-width: 800px;
             aspect-ratio: 16/9; background: #000;
             border-radius: 16px; border: 1px solid #333;
             overflow: hidden; display: flex; align-items: center; justify-content: center;
-            margin-bottom: 20px; display: none; /* Auto-hide logic */
+            margin-bottom: 20px; display: none; 
         }
         .video-stage.visible { display: flex; }
-        
         .placeholder { position: absolute; color: #444; font-weight: 500; }
         .main-view { width: 100%; height: 100%; object-fit: cover; position: absolute; z-index: 1; }
         .pip-view { 
@@ -156,24 +152,19 @@
         document.querySelector('link[rel="manifest"]').href = URL.createObjectURL(new Blob([JSON.stringify(m)],{type:'application/json'}));
     </script>
 
-    <h1>LibreCall<span class="version-tag">v0.60</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.61</span></h1>
 
     <div class="controls">
-        
         <div id="modeSelector" class="mode-selector">
-            <button class="mode-btn" onclick="selectMode('host')">
-                START CALL <span>(Send Invite)</span>
-            </button>
-            <button class="mode-btn" onclick="selectMode('join')">
-                JOIN CALL <span>(Accept Invite)</span>
-            </button>
+            <button class="mode-btn" onclick="selectMode('host')">START CALL <span>(Send Invite)</span></button>
+            <button class="mode-btn" onclick="selectMode('join')">JOIN CALL <span>(Accept Invite)</span></button>
         </div>
 
         <div id="hostPanel" class="panel">
             <div class="step-box step-active">
                 <div class="step-title">Step 1: Send Invitation</div>
                 <div class="input-group">
-                    <textarea id="hostOffer" class="code-box" readonly placeholder="Wait... Gathering Network..."></textarea>
+                    <textarea id="hostOffer" class="code-box" readonly placeholder="Generating (Wait 5s)..."></textarea>
                     <button class="side-btn" onclick="copyToClip('hostOffer')">COPY</button>
                 </div>
             </div>
@@ -228,7 +219,6 @@
     </div>
 
     <script>
-        // CONFIG: 3 Google STUN servers for reliability
         const config = { iceServers: [
             { urls: "stun:stun.l.google.com:19302" },
             { urls: "stun:stun1.l.google.com:19302" },
@@ -244,8 +234,8 @@
 
         let pc, dc, localStream, isHost = false, isConnected = false; 
         let iceComplete = false; 
+        let wakeLock = null;
 
-        // --- COMPRESSION HELPERS (GZIP) ---
         async function compress(str) {
             const stream = new Blob([str]).stream().pipeThrough(new CompressionStream("gzip"));
             return btoa(String.fromCharCode(...new Uint8Array(await new Response(stream).arrayBuffer())));
@@ -257,7 +247,8 @@
             return await new Response(stream).text();
         }
 
-        // --- WIZARD UI LOGIC ---
+        async function requestWakeLock() { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} }
+
         function selectMode(mode) {
             el('modeSelector').style.display = 'none';
             if (mode === 'host') {
@@ -267,12 +258,13 @@
                 dc = pc.createDataChannel("chat");
                 setupDC(dc);
                 pc.createOffer().then(d => pc.setLocalDescription(d));
-                log("Gathering Network Info...", 'sys');
+                log("Generating Invitation...", 'sys');
             } else {
                 isHost = false;
                 el('joinPanel').classList.add('visible');
                 log("Waiting for Invite Code...", 'sys');
             }
+            requestWakeLock();
         }
 
         function resetApp() {
@@ -285,6 +277,7 @@
             el('joinStep2').style.pointerEvents = 'none';
             el('hostAnswer').classList.remove('error');
             el('joinOffer').classList.remove('error');
+            if(wakeLock) { wakeLock.release(); wakeLock = null; }
         }
 
         async function hostConnect() {
@@ -316,7 +309,6 @@
             } catch(e) { log("Invalid Invite Code", 'sys'); }
         }
 
-        // --- WEBRTC CORE (SMART TIMEOUT) ---
         function createPC() {
             pc = new RTCPeerConnection(config);
             localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
@@ -325,24 +317,26 @@
             iceComplete = false;
             pc.onicecandidate = e => { if (!e.candidate) finalizeIce(); };
             
-            // SMART WAIT: 2 seconds to find public IP via STUN
+            // INCREASED TIMEOUT: 5 SECONDS
             setTimeout(() => {
                 if (!iceComplete && pc && pc.localDescription) {
-                    // Force generation if STUN is slow
+                    log("Taking longer... Forcing generation.", 'sys');
                     finalizeIce();
                 }
-            }, 2000); 
+            }, 5000); 
             
             pc.onconnectionstatechange = () => {
                 if (pc.connectionState === 'connected') setConnected(true);
-                if (pc.connectionState === 'failed' || pc.connectionState === 'closed') doDisconnect(false, "Connection Lost");
+                // DISABLED AUTO-DISCONNECT ON FAILURE
+                if (pc.connectionState === 'failed') {
+                    log("Network status: Failed (Waiting...)", 'sys');
+                }
             };
         }
 
         async function finalizeIce() {
             if (iceComplete) return;
             iceComplete = true;
-            
             const json = JSON.stringify(pc.localDescription);
             const code = await compress(json);
             
@@ -370,7 +364,6 @@
             } catch(e) { log("Camera/Mic blocked.", 'sys'); }
         }
 
-        // --- REST OF LOGIC ---
         function setupDC(channel) {
             dc = channel;
             dc.onopen = () => { log("Connected!", 'sys'); setConnected(true); };
@@ -406,6 +399,7 @@
             pc = null; dc = null;
             setConnected(false);
             log(reason, 'sys');
+            if(wakeLock) { wakeLock.release(); wakeLock = null; }
         }
 
         async function validateInput(elem) {
