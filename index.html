@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LibreCall v2.0 PWA</title>
+    <title>LibreCall v2.1</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#121212">
@@ -24,10 +24,8 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            /* Адаптация высоты для мобильных браузеров */
             min-height: 100vh;
             height: -webkit-fill-available;
-            /* Учет "челки" и нижнего бара на iPhone */
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
             box-sizing: border-box;
@@ -53,7 +51,7 @@
             letter-spacing: 1px;
             font-weight: 400;     
             margin-left: 10px;
-            -webkit-text-fill-color: #888; /* Вернул серый цвет */
+            -webkit-text-fill-color: #00ff9d; /* Green for success */
             text-shadow: none;
         }
 
@@ -64,7 +62,7 @@
             width: 90%;
             max-width: 1200px;
             justify-content: center;
-            flex-shrink: 0; /* Не сжимать видео, если места мало */
+            flex-shrink: 0;
         }
 
         video {
@@ -85,7 +83,7 @@
             width: 90%;
             max-width: 800px;
             margin-top: 20px;
-            margin-bottom: 20px; /* Отступ снизу для скролла */
+            margin-bottom: 20px;
             box-shadow: 0 8px 20px rgba(0,0,0,0.4);
             display: flex;
             flex-direction: row;
@@ -129,7 +127,7 @@
             color: white;
             border-radius: 8px;
             outline: none;
-            font-size: 16px; /* 16px предотвращает зум на iPhone при вводе */
+            font-size: 16px;
         }
         input.chat-input:focus { border-color: #007bff; }
 
@@ -162,7 +160,7 @@
             color: white;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            touch-action: manipulation; /* Улучшает отклик на тач */
+            touch-action: manipulation;
         }
         button.std-btn:hover { opacity: 0.9; transform: translateY(-1px); }
         button.std-btn:disabled { 
@@ -230,7 +228,7 @@
         .media-off { background-color: #d32f2f; }
         .media-on { background-color: #424242; }
 
-        /* --- MOBILE RESPONSIVE (PWA) --- */
+        /* --- MOBILE RESPONSIVE --- */
         @media (max-width: 768px) {
             h1 { font-size: 2rem; margin-top: 10px; }
             
@@ -247,7 +245,7 @@
             }
             
             .controls {
-                flex-direction: column; /* Элементы друг под другом */
+                flex-direction: column;
                 padding: 15px;
                 width: 92%;
                 gap: 25px;
@@ -258,11 +256,11 @@
             }
 
             #chatLog {
-                height: 150px; /* Чуть меньше на мобильном */
+                height: 150px;
             }
 
             button.std-btn, button.icon-btn {
-                min-height: 48px; /* Удобно для пальца */
+                min-height: 48px;
             }
         }
 
@@ -292,7 +290,7 @@
         document.querySelector('#my-manifest-placeholder').setAttribute('href', manifestURL);
     </script>
 
-    <h1>LibreCall<span class="version-tag">v2.0</span></h1>
+    <h1>LibreCall<span class="version-tag">v2.1</span></h1>
 
     <div class="videos">
         <video id="localVideo" autoplay playsinline muted></video>
@@ -375,6 +373,7 @@
         let dataChannel;
         let isConnected = false;
         let lastProcessedRemoteCode = '';
+        let offerGenerated = false;
 
         function log(msg, type = 'system') {
             const line = document.createElement('div');
@@ -394,23 +393,46 @@
         }
 
         async function compress(string) {
-            const stream = new Blob([string]).stream();
-            const compressedReadableStream = stream.pipeThrough(new CompressionStream("gzip"));
-            const compressedResponse = await new Response(compressedReadableStream);
-            const blob = await compressedResponse.blob();
-            const buffer = await blob.arrayBuffer();
-            return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+            try {
+                if (!window.CompressionStream) {
+                    throw new Error("Compression not supported");
+                }
+                const stream = new Blob([string]).stream();
+                const compressedReadableStream = stream.pipeThrough(new CompressionStream("gzip"));
+                const compressedResponse = await new Response(compressedReadableStream);
+                const blob = await compressedResponse.blob();
+                const buffer = await blob.arrayBuffer();
+                return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+            } catch(e) {
+                console.warn("Compression failed, using raw JSON", e);
+                return btoa(string); // Fallback to base64 only
+            }
         }
 
         async function decompress(base64) {
             const cleanBase64 = base64.replace(/\s+/g, '').trim();
             if (!cleanBase64) throw new Error("Empty code");
-            const binaryString = atob(cleanBase64);
-            const bytes = Uint8Array.from(binaryString, c => c.charCodeAt(0));
-            const stream = new Blob([bytes]).stream();
-            const decompressedReadableStream = stream.pipeThrough(new DecompressionStream("gzip"));
-            const decompressedResponse = await new Response(decompressedReadableStream);
-            return await decompressedResponse.text();
+            
+            try {
+                if (!window.DecompressionStream) {
+                    throw new Error("Decompression not supported");
+                }
+                const binaryString = atob(cleanBase64);
+                // Try GZIP first
+                try {
+                    const bytes = Uint8Array.from(binaryString, c => c.charCodeAt(0));
+                    const stream = new Blob([bytes]).stream();
+                    const decompressedReadableStream = stream.pipeThrough(new DecompressionStream("gzip"));
+                    const decompressedResponse = await new Response(decompressedReadableStream);
+                    return await decompressedResponse.text();
+                } catch (gzipErr) {
+                    // If gzip fails, maybe it was simple base64 (fallback)
+                    return binaryString;
+                }
+            } catch(e) {
+                 // Absolute fallback
+                 return atob(cleanBase64);
+            }
         }
 
         function toggleVideo() {
@@ -467,7 +489,24 @@
                 
             } catch (err) {
                 console.error(err);
-                log("Error: Camera access denied.", 'system');
+                log("Error: Camera access denied. Ensure HTTPS.", 'system');
+            }
+        }
+
+        async function finalizeCodeGeneration() {
+            if (offerGenerated) return; // Prevent double run
+            offerGenerated = true;
+
+            let sdp = peerConnection.localDescription.sdp;
+            const json = JSON.stringify({ type: peerConnection.localDescription.type, sdp: sdp });
+            
+            try {
+                const compressed = await compress(json);
+                localSdpBox.value = compressed;
+                updateUI();
+                log(`Code generated! Size: ${compressed.length} chars. Send it to your friend.`);
+            } catch (e) {
+                log("Error generating code: " + e.message, 'system');
             }
         }
 
@@ -488,16 +527,21 @@
                 }
             };
 
+            offerGenerated = false; // Reset flag
+
             peerConnection.onicecandidate = async (event) => {
                 if (event.candidate === null) {
-                    let sdp = peerConnection.localDescription.sdp;
-                    const json = JSON.stringify({ type: peerConnection.localDescription.type, sdp: sdp });
-                    const compressed = await compress(json);
-                    localSdpBox.value = compressed;
-                    updateUI();
-                    log(`Code generated! Size: ${compressed.length} chars. Send it to your friend.`);
+                    await finalizeCodeGeneration();
                 }
             };
+
+            // FAILSAFE: If ICE gathering is stuck (slow network), force generation after 2s
+            setTimeout(() => {
+                if (!offerGenerated && peerConnection.iceGatheringState !== 'complete') {
+                    log("Network slow. Forcing code generation...", 'system');
+                    finalizeCodeGeneration();
+                }
+            }, 2000);
         }
 
         function setupDataChannel(channel) {
@@ -556,6 +600,7 @@
             setConnectedState(false);
             clearLocalCode();
             clearRemoteCode();
+            offerGenerated = false;
         }
 
         async function createOffer() {
