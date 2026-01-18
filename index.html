@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LibreCall v0.55</title>
+    <title>LibreCall v0.57</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#121212">
@@ -21,18 +21,15 @@
             box-sizing: border-box;
         }
 
-        /* Fixed Header Alignment */
         h1 { 
             margin: 15px 0; font-weight: 200; font-size: 2.2rem;
             background: linear-gradient(45deg, #fff, #bbb);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            display: flex; align-items: baseline; justify-content: center; gap: 10px;
+            text-align: center;
         }
         .version-tag { 
-            font-size: 0.4em; 
-            -webkit-text-fill-color: #666; 
-            font-weight: 400;
-            transform: translateY(-2px);
+            font-size: 0.4em; -webkit-text-fill-color: #666; font-weight: 400;
+            vertical-align: super; margin-left: 5px;
         }
 
         /* --- CONTROLS --- */
@@ -45,7 +42,6 @@
             transition: all 0.3s ease;
         }
 
-        /* Mode Selection Buttons */
         .mode-selector { display: flex; gap: 15px; }
         .mode-btn {
             flex: 1; padding: 20px; border: 2px solid #333;
@@ -58,12 +54,10 @@
         .mode-btn:hover { background: #333; border-color: #555; }
         .mode-btn:active { transform: scale(0.98); }
 
-        /* Panels (Host/Join) */
         .panel { display: none; flex-direction: column; gap: 15px; animation: fadeIn 0.3s; }
         .panel.visible { display: flex; }
         @keyframes fadeIn { from {opacity:0} to {opacity:1} }
 
-        /* Steps */
         .step-box {
             background: #2a2a2a; padding: 12px; border-radius: 8px;
             border-left: 4px solid #444;
@@ -72,7 +66,6 @@
         .step-active { border-left-color: #00ff9d; }
         .step-wait { border-left-color: #ff9800; }
 
-        /* Inputs & Groups */
         .input-group { display: flex; gap: 8px; }
         textarea.code-box {
             flex-grow: 1; height: 45px;
@@ -84,17 +77,14 @@
         textarea.code-box:focus { outline: none; border-color: #007bff; }
         textarea.code-box.error { border-color: #ff4444; }
 
-        /* Action Buttons */
         button.action-btn {
             width: 100%; padding: 12px; border: none; border-radius: 8px;
             font-weight: 600; color: white; cursor: pointer; text-transform: uppercase;
         }
         button.action-btn:disabled { background: #333 !important; color: #666; cursor: not-allowed; }
         
-        /* WIDER Side Buttons (Copy/Paste) */
         button.side-btn {
-            width: 110px;
-            padding: 0; border: none; border-radius: 6px;
+            width: 110px; padding: 0; border: none; border-radius: 6px;
             background: #444; color: #fff; font-size: 11px; font-weight: bold;
             cursor: pointer; text-transform: uppercase;
         }
@@ -105,46 +95,21 @@
         .btn-red { background: #dc3545; }
         .btn-grey { background: #444; }
 
-        /* --- VIDEO & CHAT --- */
-        .video-stage {
-            position: relative; width: 95%; max-width: 800px;
-            aspect-ratio: 16/9; background: #000;
-            border-radius: 16px; border: 1px solid #333;
-            overflow: hidden; display: flex; align-items: center; justify-content: center;
-            margin-bottom: 20px;
-            /* Initially hidden if cam is off */
-            display: none; 
-        }
-        .video-stage.visible { display: flex; }
-
-        .placeholder { position: absolute; color: #444; font-weight: 500; }
-        
-        .main-view { width: 100%; height: 100%; object-fit: cover; position: absolute; z-index: 1; }
-        .pip-view { 
-            width: 25%; aspect-ratio: 16/9; object-fit: cover; 
-            position: absolute; bottom: 15px; right: 15px; z-index: 10;
-            border-radius: 8px; border: 2px solid rgba(255,255,255,0.3);
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: pointer;
-        }
-
         #chatLog {
             height: 120px; background: #000;
             border: 1px solid #333; border-radius: 8px;
             overflow-y: auto; padding: 10px; font-family: monospace; font-size: 12px;
         }
-        /* Chat Colors */
-        .sys { color: #ff4444; font-weight: bold; }
-        .me { color: #4caf50; font-weight: bold; }
-        .peer { color: #00bfff; font-weight: bold; }
-        
         .msg-sys { color: #ff4444; font-weight: bold; margin-left: 5px; }
         .msg-me { color: #4caf50; margin-left: 5px; }
         .msg-peer { color: #00bfff; margin-left: 5px; }
+        .sys { color: #ff4444; font-weight: bold; }
+        .me { color: #4caf50; font-weight: bold; }
+        .peer { color: #00bfff; font-weight: bold; }
 
         .chat-row { display: flex; gap: 8px; }
         .chat-input { flex: 1; padding: 10px; background: #222; border: 1px solid #444; color: #fff; border-radius: 6px; }
 
-        /* Media Buttons */
         .media-row { display: flex; gap: 10px; margin-top: 10px; }
         .media-btn { 
             flex: 1; height: 50px; border-radius: 8px; border: none; 
@@ -155,9 +120,24 @@
         .media-on { background: #333; }
         .media-off { background: #d32f2f; }
 
-        /* Connected State */
-        body.connected .mode-selector, 
-        body.connected .panel { display: none !important; }
+        .video-stage {
+            position: relative; width: 95%; max-width: 800px;
+            aspect-ratio: 16/9; background: #000;
+            border-radius: 16px; border: 1px solid #333;
+            overflow: hidden; display: flex; align-items: center; justify-content: center;
+            margin-bottom: 20px; display: none; 
+        }
+        .video-stage.visible { display: flex; }
+        .placeholder { position: absolute; color: #444; font-weight: 500; }
+        .main-view { width: 100%; height: 100%; object-fit: cover; position: absolute; z-index: 1; }
+        .pip-view { 
+            width: 25%; aspect-ratio: 16/9; object-fit: cover; 
+            position: absolute; bottom: 15px; right: 15px; z-index: 10;
+            border-radius: 8px; border: 2px solid rgba(255,255,255,0.3);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: pointer;
+        }
+
+        body.connected .mode-selector, body.connected .panel { display: none !important; }
         
         @media (max-width: 768px) {
             .video-stage { aspect-ratio: 4/5; }
@@ -172,17 +152,12 @@
         document.querySelector('link[rel="manifest"]').href = URL.createObjectURL(new Blob([JSON.stringify(m)],{type:'application/json'}));
     </script>
 
-    <h1>LibreCall<span class="version-tag">v0.55</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.57</span></h1>
 
     <div class="controls">
-        
         <div id="modeSelector" class="mode-selector">
-            <button class="mode-btn" onclick="selectMode('host')">
-                START CALL <span>(Send Invite)</span>
-            </button>
-            <button class="mode-btn" onclick="selectMode('join')">
-                JOIN CALL <span>(Accept Invite)</span>
-            </button>
+            <button class="mode-btn" onclick="selectMode('host')">START CALL <span>(Send Invite)</span></button>
+            <button class="mode-btn" onclick="selectMode('join')">JOIN CALL <span>(Accept Invite)</span></button>
         </div>
 
         <div id="hostPanel" class="panel">
@@ -255,8 +230,8 @@
 
         let pc, dc, localStream, isHost = false, isConnected = false; 
         let iceComplete = false; 
+        let wakeLock = null;
 
-        // --- COMPRESSION HELPERS ---
         async function compress(str) {
             const stream = new Blob([str]).stream().pipeThrough(new CompressionStream("gzip"));
             return btoa(String.fromCharCode(...new Uint8Array(await new Response(stream).arrayBuffer())));
@@ -268,7 +243,10 @@
             return await new Response(stream).text();
         }
 
-        // --- WIZARD LOGIC ---
+        async function requestWakeLock() {
+            try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
+        }
+
         function selectMode(mode) {
             el('modeSelector').style.display = 'none';
             if (mode === 'host') {
@@ -284,6 +262,7 @@
                 el('joinPanel').classList.add('visible');
                 log("Waiting for Invite Code...", 'sys');
             }
+            requestWakeLock();
         }
 
         function resetApp() {
@@ -296,6 +275,7 @@
             el('joinStep2').style.pointerEvents = 'none';
             el('hostAnswer').classList.remove('error');
             el('joinOffer').classList.remove('error');
+            if(wakeLock) { wakeLock.release(); wakeLock = null; }
         }
 
         async function hostConnect() {
@@ -303,17 +283,14 @@
             if(!await validateInput(el('hostAnswer'))) return;
             try {
                 const json = await decompress(code);
-                const desc = JSON.parse(json);
-                pc.setRemoteDescription(desc);
+                pc.setRemoteDescription(JSON.parse(json));
                 log("Confirmation accepted. Connecting...", 'sys');
             } catch(e) { log("Error: Bad code", 'sys'); }
         }
 
         async function joinCheckOffer() {
-            const val = el('joinOffer').value.trim();
-            const btn = el('btnJoinGen');
-            if (await validateInput(el('joinOffer'))) btn.disabled = false;
-            else btn.disabled = true;
+            if (await validateInput(el('joinOffer'))) el('btnJoinGen').disabled = false;
+            else el('btnJoinGen').disabled = true;
         }
 
         async function joinGenerate() {
@@ -323,15 +300,12 @@
             
             try {
                 const json = await decompress(code);
-                const desc = JSON.parse(json);
-                await pc.setRemoteDescription(desc);
+                await pc.setRemoteDescription(JSON.parse(json));
                 const ans = await pc.createAnswer();
                 await pc.setLocalDescription(ans);
-                // ICE will trigger finalizeIce()
             } catch(e) { log("Invalid Invite Code", 'sys'); }
         }
 
-        // --- WEBRTC CORE ---
         function createPC() {
             pc = new RTCPeerConnection(config);
             localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
@@ -345,18 +319,18 @@
                     log("Network slow. Forcing generation...", 'sys');
                     finalizeIce();
                 }
-            }, 1000); 
+            }, 4000); 
             
             pc.onconnectionstatechange = () => {
                 if (pc.connectionState === 'connected') setConnected(true);
-                if (pc.connectionState === 'failed') doDisconnect(false, "Connection Lost");
+                // FIX: Only failed/closed triggers disconnect. 'disconnected' is ignored (temp glitch)
+                if (pc.connectionState === 'failed' || pc.connectionState === 'closed') doDisconnect(false, "Connection Lost");
             };
         }
 
         async function finalizeIce() {
             if (iceComplete) return;
             iceComplete = true;
-            
             const json = JSON.stringify(pc.localDescription);
             const code = await compress(json);
             
@@ -384,7 +358,6 @@
             } catch(e) { log("Camera/Mic blocked.", 'sys'); }
         }
 
-        // --- REST OF LOGIC ---
         function setupDC(channel) {
             dc = channel;
             dc.onopen = () => { log("Connected!", 'sys'); setConnected(true); };
@@ -395,6 +368,7 @@
         }
 
         function setConnected(state) {
+            isConnected = state;
             if (state) {
                 document.body.classList.add('connected');
                 el('btnDisconnect').style.display = 'block';
@@ -419,6 +393,7 @@
             pc = null; dc = null;
             setConnected(false);
             log(reason, 'sys');
+            if(wakeLock) { wakeLock.release(); wakeLock = null; }
         }
 
         async function validateInput(elem) {
@@ -445,9 +420,8 @@
         async function pasteToField(id) {
             try {
                 const text = await navigator.clipboard.readText();
-                const field = el(id);
-                field.value = text;
-                if(id === 'hostAnswer') validateInput(field);
+                el(id).value = text;
+                if(id === 'hostAnswer') validateInput(el(id));
                 if(id === 'joinOffer') joinCheckOffer();
             } catch(e) { log("Clipboard blocked.", 'sys'); }
         }
@@ -477,24 +451,18 @@
         function updateMediaUI() {
             const v = localStream.getVideoTracks()[0].enabled;
             const a = localStream.getAudioTracks()[0].enabled;
-            
             el('btnVideo').className = v ? "media-btn media-on" : "media-btn media-off";
             el('btnVideo').innerHTML = v ? ICONS.camOn : ICONS.camOff;
-            
             el('btnAudio').className = a ? "media-btn media-on" : "media-btn media-off";
             el('btnAudio').innerHTML = a ? ICONS.micOn : ICONS.micOff;
-            
             updateVideoVisibility();
         }
 
         function updateVideoVisibility() {
             const vEnabled = localStream && localStream.getVideoTracks()[0].enabled;
             el('localVideo').style.display = vEnabled ? 'block' : 'none';
-            if (vEnabled || isConnected) {
-                el('videoContainer').classList.add('visible');
-            } else {
-                el('videoContainer').classList.remove('visible');
-            }
+            if (vEnabled || isConnected) el('videoContainer').classList.add('visible');
+            else el('videoContainer').classList.remove('visible');
         }
 
         function vidClick(v) {
