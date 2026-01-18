@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LibreCall v0.51</title>
+    <title>LibreCall v0.52</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#121212">
@@ -21,7 +21,7 @@
             box-sizing: border-box;
         }
 
-        /* Fixed Header Alignment */
+        /* Header */
         h1 { 
             margin: 15px 0; font-weight: 200; font-size: 2.2rem;
             background: linear-gradient(45deg, #fff, #bbb);
@@ -29,13 +29,11 @@
             display: flex; align-items: baseline; justify-content: center; gap: 10px;
         }
         .version-tag { 
-            font-size: 0.4em; 
-            -webkit-text-fill-color: #666; 
-            font-weight: 400;
-            transform: translateY(-2px); /* Slight adjustment */
+            font-size: 0.4em; -webkit-text-fill-color: #666; 
+            font-weight: 400; transform: translateY(-2px);
         }
 
-        /* --- WIZARD CONTROLS --- */
+        /* --- CONTROLS --- */
         .controls {
             background: #1e1e1e; padding: 20px;
             border-radius: 16px; width: 95%; max-width: 600px;
@@ -45,7 +43,7 @@
             transition: all 0.3s ease;
         }
 
-        /* Mode Selection Buttons */
+        /* Mode Selection */
         .mode-selector { display: flex; gap: 15px; }
         .mode-btn {
             flex: 1; padding: 20px; border: 2px solid #333;
@@ -58,7 +56,7 @@
         .mode-btn:hover { background: #333; border-color: #555; }
         .mode-btn:active { transform: scale(0.98); }
 
-        /* Panels (Host/Join) */
+        /* Panels */
         .panel { display: none; flex-direction: column; gap: 15px; animation: fadeIn 0.3s; }
         .panel.visible { display: flex; }
         @keyframes fadeIn { from {opacity:0} to {opacity:1} }
@@ -72,7 +70,7 @@
         .step-active { border-left-color: #00ff9d; }
         .step-wait { border-left-color: #ff9800; }
 
-        /* Inputs & Groups */
+        /* Inputs */
         .input-group { display: flex; gap: 8px; }
         textarea.code-box {
             flex-grow: 1; height: 45px;
@@ -84,14 +82,13 @@
         textarea.code-box:focus { outline: none; border-color: #007bff; }
         textarea.code-box.error { border-color: #ff4444; }
 
-        /* Action Buttons */
+        /* Buttons */
         button.action-btn {
             width: 100%; padding: 12px; border: none; border-radius: 8px;
             font-weight: 600; color: white; cursor: pointer; text-transform: uppercase;
         }
         button.action-btn:disabled { background: #333 !important; color: #666; cursor: not-allowed; }
         
-        /* Small Side Buttons (Copy/Paste) */
         button.side-btn {
             width: 60px; padding: 0; border: none; border-radius: 6px;
             background: #444; color: #fff; font-size: 10px; font-weight: bold;
@@ -104,42 +101,23 @@
         .btn-red { background: #dc3545; }
         .btn-grey { background: #444; }
 
-        /* --- VIDEO & CHAT --- */
-        .video-stage {
-            position: relative; width: 95%; max-width: 800px;
-            aspect-ratio: 16/9; background: #000;
-            border-radius: 16px; border: 1px solid #333;
-            overflow: hidden; display: flex; align-items: center; justify-content: center;
-            margin-bottom: 20px;
-        }
-        .placeholder { position: absolute; color: #444; font-weight: 500; }
-        
-        .main-view { width: 100%; height: 100%; object-fit: cover; position: absolute; z-index: 1; }
-        .pip-view { 
-            width: 25%; aspect-ratio: 16/9; object-fit: cover; 
-            position: absolute; bottom: 15px; right: 15px; z-index: 10;
-            border-radius: 8px; border: 2px solid rgba(255,255,255,0.3);
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: pointer;
-        }
-
+        /* Chat */
         #chatLog {
             height: 120px; background: #000;
             border: 1px solid #333; border-radius: 8px;
             overflow-y: auto; padding: 10px; font-family: monospace; font-size: 12px;
         }
-        /* Chat Colors */
-        .sys { color: #ff4444; font-weight: bold; }
-        .me { color: #4caf50; font-weight: bold; }
-        .peer { color: #00bfff; font-weight: bold; }
-        
         .msg-sys { color: #ff4444; font-weight: bold; margin-left: 5px; }
         .msg-me { color: #4caf50; margin-left: 5px; }
         .msg-peer { color: #00bfff; margin-left: 5px; }
+        .sys { color: #ff4444; font-weight: bold; }
+        .me { color: #4caf50; font-weight: bold; }
+        .peer { color: #00bfff; font-weight: bold; }
 
         .chat-row { display: flex; gap: 8px; }
         .chat-input { flex: 1; padding: 10px; background: #222; border: 1px solid #444; color: #fff; border-radius: 6px; }
 
-        /* Media Buttons */
+        /* Media */
         .media-row { display: flex; gap: 10px; margin-top: 10px; }
         .media-btn { 
             flex: 1; height: 50px; border-radius: 8px; border: none; 
@@ -150,9 +128,24 @@
         .media-on { background: #333; }
         .media-off { background: #d32f2f; }
 
-        /* Connected State */
-        body.connected .mode-selector, 
-        body.connected .panel { display: none !important; }
+        /* Video */
+        .video-stage {
+            position: relative; width: 95%; max-width: 800px;
+            aspect-ratio: 16/9; background: #000;
+            border-radius: 16px; border: 1px solid #333;
+            overflow: hidden; display: flex; align-items: center; justify-content: center;
+            margin-bottom: 20px;
+        }
+        .placeholder { position: absolute; color: #444; font-weight: 500; }
+        .main-view { width: 100%; height: 100%; object-fit: cover; position: absolute; z-index: 1; }
+        .pip-view { 
+            width: 25%; aspect-ratio: 16/9; object-fit: cover; 
+            position: absolute; bottom: 15px; right: 15px; z-index: 10;
+            border-radius: 8px; border: 2px solid rgba(255,255,255,0.3);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: pointer;
+        }
+
+        body.connected .mode-selector, body.connected .panel { display: none !important; }
         
         @media (max-width: 768px) {
             .video-stage { aspect-ratio: 4/5; }
@@ -167,18 +160,16 @@
         document.querySelector('link[rel="manifest"]').href = URL.createObjectURL(new Blob([JSON.stringify(m)],{type:'application/json'}));
     </script>
 
-    <h1>LibreCall<span class="version-tag">v0.51</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.52</span></h1>
 
     <div class="controls">
         
         <div id="modeSelector" class="mode-selector">
             <button class="mode-btn" onclick="selectMode('host')">
-                START CALL
-                <span>(Send Invite)</span>
+                START CALL <span>(Send Invite)</span>
             </button>
             <button class="mode-btn" onclick="selectMode('join')">
-                JOIN CALL
-                <span>(Accept Invite)</span>
+                JOIN CALL <span>(Accept Invite)</span>
             </button>
         </div>
 
@@ -190,7 +181,6 @@
                     <button class="side-btn" onclick="copyToClip('hostOffer')">COPY</button>
                 </div>
             </div>
-            
             <div class="step-box step-wait">
                 <div class="step-title">Step 2: Paste Confirmation</div>
                 <div class="input-group">
@@ -211,7 +201,6 @@
                 </div>
                 <button id="btnJoinGen" class="action-btn btn-blue" style="margin-top:10px" onclick="joinGenerate()" disabled>CREATE CONFIRMATION</button>
             </div>
-
             <div id="joinStep2" class="step-box" style="opacity:0.5; pointer-events:none;">
                 <div class="step-title">Step 2: Send Confirmation</div>
                 <div class="input-group">
@@ -231,10 +220,8 @@
         </div>
 
         <div class="media-row">
-            <button id="btnVideo" class="media-btn media-off" onclick="toggleMedia('video')">
-                </button>
-            <button id="btnAudio" class="media-btn media-off" onclick="toggleMedia('audio')">
-                </button>
+            <button id="btnVideo" class="media-btn media-off" onclick="toggleMedia('video')"></button>
+            <button id="btnAudio" class="media-btn media-off" onclick="toggleMedia('audio')"></button>
         </div>
     </div>
 
@@ -247,8 +234,6 @@
     <script>
         const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
         const el = id => document.getElementById(id);
-        
-        // ICONS (Normal & Slashed)
         const ICONS = {
             camOn: '<svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>',
             camOff: '<svg viewBox="0 0 24 24"><path d="M9.56 8l-2-2-4.15-4.15L2 3.27 4.73 6H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.21 0 .39-.08.54-.18L19.73 21l1.27-1.27-11.44-11.73zM16 16.17L5.83 6H16v10.17zM18 7c0-.55-.45-1-1-1h-2.17l2 2V7zm2 8.17V7l-4 3.33V12l2.34 2.34L20 15.17z"/></svg>',
@@ -256,8 +241,8 @@
             micOff: '<svg viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l2.97 2.97c-.85.35-1.76.57-2.75.57-3.7 0-6.73-2.94-6.88-6.6l-.01.03H4.15c.16 4.61 3.75 8.41 8.35 8.9V21h3v-1.14l4.22 4.23L21 22.73 4.27 3z"/></svg>'
         };
 
-        let pc, dc, localStream;
-        let isHost = false; 
+        let pc, dc, localStream, isHost = false; 
+        let iceComplete = false; // Flag to track ICE completion
 
         // --- WIZARD LOGIC ---
         function selectMode(mode) {
@@ -316,17 +301,58 @@
                 pc.setRemoteDescription(desc)
                 .then(() => pc.createAnswer())
                 .then(a => pc.setLocalDescription(a))
-                .then(() => {
-                    el('joinStep2').style.opacity = '1';
-                    el('joinStep2').style.pointerEvents = 'all';
-                    el('btnJoinGen').disabled = true;
-                    el('btnJoinGen').innerText = "DONE";
-                    log("Confirmation generated!", 'sys');
-                });
+                .then(() => log("Generating Confirmation...", 'sys'));
             } catch(e) { log("Invalid Invite Code", 'sys'); }
         }
 
-        // --- CORE WEBRTC ---
+        // --- WEBRTC CORE (With ICE Failsafe) ---
+        function createPC() {
+            pc = new RTCPeerConnection(config);
+            localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+            pc.ontrack = e => el('remoteVideo').srcObject = e.streams[0];
+            
+            iceComplete = false;
+            
+            // 1. Standard ICE Gathering
+            pc.onicecandidate = e => {
+                if (!e.candidate) finalizeIce(); // All done
+            };
+            
+            // 2. Failsafe Timer (Crucial for Mobile!)
+            setTimeout(() => {
+                if (!iceComplete && pc && pc.localDescription) {
+                    log("Network slow. Forcing generation...", 'sys');
+                    finalizeIce();
+                }
+            }, 1000); // 1 second timeout
+            
+            pc.onconnectionstatechange = () => {
+                if (pc.connectionState === 'connected') setConnected(true);
+                if (pc.connectionState === 'failed') doDisconnect(false, "Connection Lost");
+            };
+        }
+
+        function finalizeIce() {
+            if (iceComplete) return;
+            iceComplete = true;
+            
+            // Generate Code
+            const code = btoa(JSON.stringify(pc.localDescription));
+            
+            if (isHost) {
+                el('hostOffer').value = code;
+                log("Invitation Generated!", 'sys');
+            } else {
+                el('joinAnswer').value = code;
+                // Enable UI for Step 2
+                el('joinStep2').style.opacity = '1';
+                el('joinStep2').style.pointerEvents = 'all';
+                el('btnJoinGen').disabled = true;
+                el('btnJoinGen').innerText = "DONE";
+                log("Confirmation Generated!", 'sys');
+            }
+        }
+
         async function start() {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
@@ -337,25 +363,7 @@
             } catch(e) { log("Camera blocked.", 'sys'); }
         }
 
-        function createPC() {
-            pc = new RTCPeerConnection(config);
-            localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-            pc.ontrack = e => el('remoteVideo').srcObject = e.streams[0];
-            
-            pc.onicecandidate = e => {
-                if (!e.candidate) {
-                    const code = btoa(JSON.stringify(pc.localDescription));
-                    if (isHost) el('hostOffer').value = code;
-                    else el('joinAnswer').value = code;
-                }
-            };
-            
-            pc.onconnectionstatechange = () => {
-                if (pc.connectionState === 'connected') setConnected(true);
-                if (pc.connectionState === 'failed') doDisconnect(false, "Connection Lost");
-            };
-        }
-
+        // --- REST OF LOGIC ---
         function setupDC(channel) {
             dc = channel;
             dc.onopen = () => { log("Connected!", 'sys'); setConnected(true); };
@@ -390,7 +398,6 @@
             log(reason, 'sys');
         }
 
-        // --- UTILS ---
         function validateInput(elem) {
             const str = elem.value.trim();
             let isValid = false;
@@ -416,10 +423,9 @@
                 const text = await navigator.clipboard.readText();
                 const field = el(id);
                 field.value = text;
-                // Trigger input logic based on field
                 if(id === 'hostAnswer') validateInput(field);
                 if(id === 'joinOffer') joinCheckOffer();
-            } catch(e) { log("Clipboard access denied", 'sys'); }
+            } catch(e) { log("Clipboard blocked.", 'sys'); }
         }
 
         function doSend() {
@@ -430,13 +436,10 @@
         function log(m, type) {
             const d = document.createElement('div');
             const t = new Date().toLocaleTimeString();
-            let n = "SYS", c = "sys";
-            let bodyClass = "msg-sys";
-            
-            if(type==='me') { n="YOU"; c="me"; bodyClass="msg-me"; }
-            if(type==='peer') { n="FRIEND"; c="peer"; bodyClass="msg-peer"; }
-            
-            d.innerHTML = `<span style="color:#666">[${t}]</span> <span class="${c}">${n}:</span> <span class="${bodyClass}">${m}</span>`;
+            let n = "SYS", c = "sys", b = "msg-sys";
+            if(type==='me') { n="YOU"; c="me"; b="msg-me"; }
+            if(type==='peer') { n="FRIEND"; c="peer"; b="msg-peer"; }
+            d.innerHTML = `<span style="color:#666">[${t}]</span> <span class="${c}">${n}:</span> <span class="${b}">${m}</span>`;
             el('chatLog').append(d); el('chatLog').scrollTop = 9999;
         }
 
