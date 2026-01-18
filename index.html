@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LibreCall v0.61</title>
+    <title>LibreCall v0.70 (Auto)</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#121212">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzEyMTIxMiIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMTgwIiBmaWxsPSIjMDA3YmZmIi8+PHBhdGggZD0iTTI1NiAxNTZsLTQwIDQwIDQwIDQwIDQwLTQwLTQwLTQwem0wIDAgdjgwIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48L3N2Zz4=">
+
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
     <style>
         /* --- CORE --- */
@@ -23,7 +23,7 @@
 
         h1 { 
             margin: 15px 0; font-weight: 200; font-size: 2.2rem;
-            background: linear-gradient(45deg, #fff, #bbb);
+            background: linear-gradient(45deg, #00ff9d, #00bfff);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             display: flex; align-items: baseline; justify-content: center; gap: 10px;
         }
@@ -41,6 +41,14 @@
             margin-bottom: 20px; z-index: 20;
             transition: all 0.3s ease;
         }
+
+        /* Tabs for Auto vs Manual */
+        .tab-bar { display: flex; gap: 5px; background: #111; padding: 4px; border-radius: 8px; margin-bottom: 10px; }
+        .tab-btn {
+            flex: 1; padding: 10px; border: none; background: transparent; color: #888;
+            font-weight: 600; cursor: pointer; border-radius: 6px; transition: 0.2s;
+        }
+        .tab-btn.active { background: #333; color: #fff; }
 
         .mode-selector { display: flex; gap: 15px; }
         .mode-btn {
@@ -75,7 +83,12 @@
             box-sizing: border-box; resize: none;
         }
         textarea.code-box:focus { outline: none; border-color: #007bff; }
-        textarea.code-box.error { border-color: #ff4444; }
+        input.room-input {
+            width: 100%; padding: 15px; font-size: 24px; text-align: center;
+            background: #111; border: 2px solid #444; color: #fff; border-radius: 8px;
+            letter-spacing: 5px; font-family: monospace; text-transform: uppercase;
+        }
+        input.room-input:focus { outline: none; border-color: #007bff; }
 
         button.action-btn {
             width: 100%; padding: 12px; border: none; border-radius: 8px;
@@ -88,8 +101,7 @@
             background: #444; color: #fff; font-size: 11px; font-weight: bold;
             cursor: pointer; text-transform: uppercase;
         }
-        button.side-btn:active { background: #666; }
-
+        
         .btn-blue { background: #007bff; }
         .btn-green { background: #28a745; }
         .btn-red { background: #dc3545; }
@@ -100,12 +112,9 @@
             border: 1px solid #333; border-radius: 8px;
             overflow-y: auto; padding: 10px; font-family: monospace; font-size: 12px;
         }
-        .msg-sys { color: #ff4444; font-weight: bold; margin-left: 5px; }
-        .msg-me { color: #4caf50; margin-left: 5px; }
-        .msg-peer { color: #00bfff; margin-left: 5px; }
-        .sys { color: #ff4444; font-weight: bold; }
-        .me { color: #4caf50; font-weight: bold; }
-        .peer { color: #00bfff; font-weight: bold; }
+        .msg-sys { color: #ff4444; font-weight: bold; }
+        .msg-me { color: #4caf50; }
+        .msg-peer { color: #00bfff; }
 
         .chat-row { display: flex; gap: 8px; }
         .chat-input { flex: 1; padding: 10px; background: #222; border: 1px solid #444; color: #fff; border-radius: 6px; }
@@ -137,12 +146,10 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.5); cursor: pointer;
         }
 
-        body.connected .mode-selector, body.connected .panel { display: none !important; }
+        body.connected .controls > :not(#chatLog, .chat-row, .media-row, #btnDisconnect) { display: none !important; }
+        body.connected .controls { width: 95%; }
         
-        @media (max-width: 768px) {
-            .video-stage { aspect-ratio: 4/5; }
-            .pip-view { width: 30%; bottom: 10px; right: 10px; }
-        }
+        .mqtt-status { font-size: 11px; text-align: center; color: #666; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -152,50 +159,74 @@
         document.querySelector('link[rel="manifest"]').href = URL.createObjectURL(new Blob([JSON.stringify(m)],{type:'application/json'}));
     </script>
 
-    <h1>LibreCall<span class="version-tag">v0.61</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.70</span></h1>
 
     <div class="controls">
-        <div id="modeSelector" class="mode-selector">
-            <button class="mode-btn" onclick="selectMode('host')">START CALL <span>(Send Invite)</span></button>
-            <button class="mode-btn" onclick="selectMode('join')">JOIN CALL <span>(Accept Invite)</span></button>
+        <div id="tabBar" class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab('auto')">INTERNET (Auto)</button>
+            <button class="tab-btn" onclick="switchTab('manual')">MANUAL (Secure)</button>
         </div>
 
-        <div id="hostPanel" class="panel">
-            <div class="step-box step-active">
-                <div class="step-title">Step 1: Send Invitation</div>
-                <div class="input-group">
-                    <textarea id="hostOffer" class="code-box" readonly placeholder="Generating (Wait 5s)..."></textarea>
-                    <button class="side-btn" onclick="copyToClip('hostOffer')">COPY</button>
-                </div>
+        <div id="uiAuto">
+            <div class="mode-selector">
+                <button class="mode-btn" onclick="startAuto('host')">START CALL <span>(Get Code)</span></button>
+                <button class="mode-btn" onclick="startAuto('join')">JOIN CALL <span>(Enter Code)</span></button>
             </div>
-            <div class="step-box step-wait">
-                <div class="step-title">Step 2: Paste Confirmation</div>
-                <div class="input-group">
-                    <textarea id="hostAnswer" class="code-box" placeholder="Paste confirmation code..." oninput="validateInput(this)"></textarea>
-                    <button class="side-btn" onclick="pasteToField('hostAnswer')">PASTE</button>
+            
+            <div id="autoPanel" class="panel">
+                <div class="step-box step-active">
+                    <div class="step-title" id="autoTitle">Room Code</div>
+                    <input id="roomCode" class="room-input" placeholder="____" maxlength="6" oninput="this.value=this.value.toUpperCase()">
+                    <div id="mqttStatus" class="mqtt-status">Not connected</div>
+                    <button id="btnAutoConnect" class="action-btn btn-green" style="margin-top:10px; display:none" onclick="connectMQTT()">CONNECT</button>
                 </div>
-                <button id="btnHostConnect" class="action-btn btn-green" style="margin-top:10px" onclick="hostConnect()" disabled>CONNECT</button>
+                <button class="action-btn btn-grey" onclick="resetApp()">CANCEL</button>
             </div>
-            <button class="action-btn btn-grey" onclick="resetApp()">CANCEL</button>
         </div>
 
-        <div id="joinPanel" class="panel">
-            <div class="step-box step-wait">
-                <div class="step-title">Step 1: Paste Invitation</div>
-                <div class="input-group">
-                    <textarea id="joinOffer" class="code-box" placeholder="Paste invite code..." oninput="joinCheckOffer()"></textarea>
-                    <button class="side-btn" onclick="pasteToField('joinOffer')">PASTE</button>
-                </div>
-                <button id="btnJoinGen" class="action-btn btn-blue" style="margin-top:10px" onclick="joinGenerate()" disabled>CREATE CONFIRMATION</button>
+        <div id="uiManual" style="display:none">
+            <div class="mode-selector">
+                <button class="mode-btn" onclick="selectManual('host')">START CALL <span>(Send Invite)</span></button>
+                <button class="mode-btn" onclick="selectManual('join')">JOIN CALL <span>(Accept Invite)</span></button>
             </div>
-            <div id="joinStep2" class="step-box" style="opacity:0.5; pointer-events:none;">
-                <div class="step-title">Step 2: Send Confirmation</div>
-                <div class="input-group">
-                    <textarea id="joinAnswer" class="code-box" readonly placeholder="..."></textarea>
-                    <button class="side-btn" onclick="copyToClip('joinAnswer')">COPY</button>
+
+            <div id="hostPanel" class="panel">
+                <div class="step-box step-active">
+                    <div class="step-title">Step 1: Send Invitation</div>
+                    <div class="input-group">
+                        <textarea id="hostOffer" class="code-box" readonly placeholder="Generating..."></textarea>
+                        <button class="side-btn" onclick="copyToClip('hostOffer')">COPY</button>
+                    </div>
                 </div>
+                <div class="step-box step-wait">
+                    <div class="step-title">Step 2: Paste Confirmation</div>
+                    <div class="input-group">
+                        <textarea id="hostAnswer" class="code-box" placeholder="Paste confirmation..." oninput="validateInput(this)"></textarea>
+                        <button class="side-btn" onclick="pasteToField('hostAnswer')">PASTE</button>
+                    </div>
+                    <button id="btnHostConnect" class="action-btn btn-green" style="margin-top:10px" onclick="hostConnectManual()" disabled>CONNECT</button>
+                </div>
+                <button class="action-btn btn-grey" onclick="resetApp()">CANCEL</button>
             </div>
-            <button class="action-btn btn-grey" onclick="resetApp()">CANCEL</button>
+
+            <div id="joinPanel" class="panel">
+                <div class="step-box step-wait">
+                    <div class="step-title">Step 1: Paste Invitation</div>
+                    <div class="input-group">
+                        <textarea id="joinOffer" class="code-box" placeholder="Paste invite code..." oninput="joinCheckOffer()"></textarea>
+                        <button class="side-btn" onclick="pasteToField('joinOffer')">PASTE</button>
+                    </div>
+                    <button id="btnJoinGen" class="action-btn btn-blue" style="margin-top:10px" onclick="joinGenerate()" disabled>CREATE CONFIRMATION</button>
+                </div>
+                <div id="joinStep2" class="step-box" style="opacity:0.5; pointer-events:none;">
+                    <div class="step-title">Step 2: Send Confirmation</div>
+                    <div class="input-group">
+                        <textarea id="joinAnswer" class="code-box" readonly placeholder="..."></textarea>
+                        <button class="side-btn" onclick="copyToClip('joinAnswer')">COPY</button>
+                    </div>
+                </div>
+                <button class="action-btn btn-grey" onclick="resetApp()">CANCEL</button>
+            </div>
         </div>
 
         <button id="btnDisconnect" class="action-btn btn-red" style="display:none" onclick="doDisconnect(true, 'Call ended by YOU.')">DISCONNECT</button>
@@ -213,17 +244,16 @@
     </div>
 
     <div id="videoContainer" class="video-stage">
-        <div class="placeholder">Waiting...</div>
+        <div class="placeholder">Waiting for Video...</div>
         <video id="remoteVideo" class="main-view" autoplay playsinline onclick="vidClick(this)"></video>
         <video id="localVideo" class="pip-view" autoplay playsinline muted onclick="vidClick(this)"></video>
     </div>
 
     <script>
-        const config = { iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:stun1.l.google.com:19302" },
-            { urls: "stun:stun2.l.google.com:19302" }
-        ]};
+        // CONFIG
+        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt"; // Public Broker over SSL
+
         const el = id => document.getElementById(id);
         const ICONS = {
             camOn: '<svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>',
@@ -232,10 +262,12 @@
             micOff: '<svg viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l2.97 2.97c-.85.35-1.76.57-2.75.57-3.7 0-6.73-2.94-6.88-6.6l-.01.03H4.15c.16 4.61 3.75 8.41 8.35 8.9V21h3v-1.14l4.22 4.23L21 22.73 4.27 3z"/></svg>'
         };
 
-        let pc, dc, localStream, isHost = false, isConnected = false; 
-        let iceComplete = false; 
-        let wakeLock = null;
+        let pc, dc, localStream, mqClient;
+        let isHost = false, isConnected = false, isAuto = false;
+        let iceComplete = false, wakeLock = null;
+        let currentRoom = "";
 
+        // --- COMPRESSION HELPERS ---
         async function compress(str) {
             const stream = new Blob([str]).stream().pipeThrough(new CompressionStream("gzip"));
             return btoa(String.fromCharCode(...new Uint8Array(await new Response(stream).arrayBuffer())));
@@ -247,10 +279,129 @@
             return await new Response(stream).text();
         }
 
-        async function requestWakeLock() { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} }
+        // --- UI NAVIGATION ---
+        function switchTab(tab) {
+            if(isConnected) return;
+            resetApp();
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if(tab === 'auto') {
+                el('uiAuto').style.display = 'block';
+                el('uiManual').style.display = 'none';
+            } else {
+                el('uiAuto').style.display = 'none';
+                el('uiManual').style.display = 'block';
+            }
+        }
 
-        function selectMode(mode) {
-            el('modeSelector').style.display = 'none';
+        function resetApp() {
+            doDisconnect(false, "Reset.");
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('visible'));
+            document.querySelectorAll('.mode-selector').forEach(m => m.style.display = 'flex');
+            
+            // Clean inputs
+            ['hostOffer','hostAnswer','joinOffer','joinAnswer','roomCode'].forEach(i => { if(el(i)) el(i).value = ''; });
+            el('mqttStatus').innerText = "Not connected";
+            el('joinStep2').style.opacity = '0.5';
+            
+            if(mqClient) { mqClient.end(); mqClient = null; }
+            if(wakeLock) { wakeLock.release(); wakeLock = null; }
+        }
+
+        // --- AUTO MODE (MQTT) ---
+        function startAuto(role) {
+            isAuto = true;
+            isHost = (role === 'host');
+            
+            el('uiAuto').querySelector('.mode-selector').style.display = 'none';
+            el('autoPanel').classList.add('visible');
+            requestWakeLock();
+
+            if(isHost) {
+                // Generate random room code
+                currentRoom = Math.random().toString(36).substring(2, 6).toUpperCase();
+                el('roomCode').value = currentRoom;
+                el('roomCode').readOnly = true;
+                el('autoTitle').innerText = "Share this Code";
+                el('btnAutoConnect').style.display = 'none';
+                connectMQTT(); // Host connects immediately
+            } else {
+                el('roomCode').value = "";
+                el('roomCode').readOnly = false;
+                el('autoTitle').innerText = "Enter Host Code";
+                el('btnAutoConnect').style.display = 'block';
+            }
+        }
+
+        function connectMQTT() {
+            if(!isHost) currentRoom = el('roomCode').value.toUpperCase().trim();
+            if(currentRoom.length < 3) return alert("Invalid Code");
+            
+            if(!isHost) {
+                el('btnAutoConnect').disabled = true;
+                el('btnAutoConnect').innerText = "CONNECTING...";
+            }
+
+            el('mqttStatus').innerText = "Connecting to public network...";
+            
+            const clientId = 'lc_' + Math.random().toString(16).substr(2, 8);
+            mqClient = mqtt.connect(MQTT_BROKER, { clientId: clientId });
+
+            mqClient.on('connect', () => {
+                el('mqttStatus').innerText = "Network Connected. Waiting for peer...";
+                // Subscribe to our specific role channel
+                const topic = `librecall/v1/${currentRoom}/${isHost ? 'host' : 'guest'}`;
+                mqClient.subscribe(topic);
+                
+                // If Guest, announce presence
+                if(!isHost) {
+                    publishSig('join', {});
+                    createPC(); // Prepare PC
+                }
+            });
+
+            mqClient.on('message', async (topic, message) => {
+                const msg = JSON.parse(message.toString());
+                if(msg.sender === clientId) return; // Ignore self
+
+                log(`Sig: ${msg.type}`, 'sys');
+
+                if(msg.type === 'join' && isHost) {
+                    // Guest is here. Start Host process.
+                    createPC();
+                    dc = pc.createDataChannel("chat");
+                    setupDC(dc);
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    // Wait for ICE gathering in createPC to trigger finalizeIce -> publishSig
+                }
+                
+                if(msg.type === 'offer' && !isHost) {
+                    if(!pc) createPC();
+                    await pc.setRemoteDescription(msg.data);
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    // ICE will trigger finalizeIce -> publishSig('answer')
+                }
+
+                if(msg.type === 'answer' && isHost) {
+                    await pc.setRemoteDescription(msg.data);
+                }
+            });
+        }
+
+        function publishSig(type, data) {
+            // Send to the OTHER person's topic
+            const targetTopic = `librecall/v1/${currentRoom}/${isHost ? 'guest' : 'host'}`;
+            const payload = JSON.stringify({ type: type, data: data, sender: mqClient.options.clientId });
+            mqClient.publish(targetTopic, payload);
+        }
+
+        // --- MANUAL MODE ---
+        function selectManual(mode) {
+            isAuto = false;
+            el('uiManual').querySelector('.mode-selector').style.display = 'none';
             if (mode === 'host') {
                 isHost = true;
                 el('hostPanel').classList.add('visible');
@@ -258,117 +409,92 @@
                 dc = pc.createDataChannel("chat");
                 setupDC(dc);
                 pc.createOffer().then(d => pc.setLocalDescription(d));
-                log("Generating Invitation...", 'sys');
             } else {
                 isHost = false;
                 el('joinPanel').classList.add('visible');
-                log("Waiting for Invite Code...", 'sys');
             }
             requestWakeLock();
         }
 
-        function resetApp() {
-            doDisconnect(false, "Reset.");
-            el('hostPanel').classList.remove('visible');
-            el('joinPanel').classList.remove('visible');
-            el('modeSelector').style.display = 'flex';
-            ['hostOffer','hostAnswer','joinOffer','joinAnswer'].forEach(i => el(i).value = '');
-            el('joinStep2').style.opacity = '0.5';
-            el('joinStep2').style.pointerEvents = 'none';
-            el('hostAnswer').classList.remove('error');
-            el('joinOffer').classList.remove('error');
-            if(wakeLock) { wakeLock.release(); wakeLock = null; }
-        }
-
-        async function hostConnect() {
+        async function hostConnectManual() {
             const code = el('hostAnswer').value.trim();
-            if(!await validateInput(el('hostAnswer'))) return;
             try {
                 const json = await decompress(code);
                 pc.setRemoteDescription(JSON.parse(json));
-                log("Confirmation accepted. Connecting...", 'sys');
+                log("Manual connection accepted.", 'sys');
             } catch(e) { log("Error: Bad code", 'sys'); }
         }
 
-        async function joinCheckOffer() {
-            if (await validateInput(el('joinOffer'))) el('btnJoinGen').disabled = false;
-            else el('btnJoinGen').disabled = true;
-        }
-
         async function joinGenerate() {
-            const code = el('joinOffer').value.trim();
             createPC();
             pc.ondatachannel = e => setupDC(e.channel);
-            
             try {
-                const json = await decompress(code);
+                const json = await decompress(el('joinOffer').value.trim());
                 await pc.setRemoteDescription(JSON.parse(json));
                 const ans = await pc.createAnswer();
                 await pc.setLocalDescription(ans);
-                log("Gathering Network Info...", 'sys');
-            } catch(e) { log("Invalid Invite Code", 'sys'); }
+            } catch(e) { log("Invalid Code", 'sys'); }
         }
 
+        // --- WEBRTC CORE ---
         function createPC() {
+            if(pc) return; // Prevent duplicates
             pc = new RTCPeerConnection(config);
-            localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-            pc.ontrack = e => el('remoteVideo').srcObject = e.streams[0];
+            if(localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+            
+            pc.ontrack = e => {
+                el('remoteVideo').srcObject = e.streams[0];
+                el('remoteVideo').play().catch(e=>console.log(e));
+            };
             
             iceComplete = false;
             pc.onicecandidate = e => { if (!e.candidate) finalizeIce(); };
             
-            // INCREASED TIMEOUT: 5 SECONDS
+            // Timeout for ICE gathering
             setTimeout(() => {
                 if (!iceComplete && pc && pc.localDescription) {
-                    log("Taking longer... Forcing generation.", 'sys');
+                    log("ICE timeout. Finalizing...", 'sys');
                     finalizeIce();
                 }
-            }, 5000); 
-            
+            }, 3000); 
+
             pc.onconnectionstatechange = () => {
                 if (pc.connectionState === 'connected') setConnected(true);
-                // DISABLED AUTO-DISCONNECT ON FAILURE
-                if (pc.connectionState === 'failed') {
-                    log("Network status: Failed (Waiting...)", 'sys');
-                }
+                if (pc.connectionState === 'failed') log("Connection Failed", 'sys');
             };
         }
 
         async function finalizeIce() {
             if (iceComplete) return;
             iceComplete = true;
-            const json = JSON.stringify(pc.localDescription);
-            const code = await compress(json);
             
-            if (isHost) {
-                el('hostOffer').value = code;
-                log("Invitation Ready!", 'sys');
+            // For Manual: Compress and show code
+            // For Auto: Publish JSON via MQTT
+            
+            if (isAuto) {
+                if(isHost) publishSig('offer', pc.localDescription);
+                else publishSig('answer', pc.localDescription);
+                log("Signaling sent!", 'sys');
             } else {
-                el('joinAnswer').value = code;
-                el('joinStep2').style.opacity = '1';
-                el('joinStep2').style.pointerEvents = 'all';
-                el('btnJoinGen').disabled = true;
-                el('btnJoinGen').innerText = "DONE";
-                log("Confirmation Ready!", 'sys');
+                const json = JSON.stringify(pc.localDescription);
+                const code = await compress(json);
+                if (isHost) {
+                    el('hostOffer').value = code;
+                } else {
+                    el('joinAnswer').value = code;
+                    el('joinStep2').style.opacity = '1';
+                    el('joinStep2').style.pointerEvents = 'all';
+                    el('btnJoinGen').disabled = true;
+                    el('btnJoinGen').innerText = "DONE";
+                }
             }
-        }
-
-        async function start() {
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
-                el('localVideo').srcObject = localStream;
-                localStream.getAudioTracks()[0].enabled = true; // Mic ON
-                localStream.getVideoTracks()[0].enabled = false; // Cam OFF
-                updateMediaUI();
-                log("Devices Ready.", 'sys');
-            } catch(e) { log("Camera/Mic blocked.", 'sys'); }
         }
 
         function setupDC(channel) {
             dc = channel;
-            dc.onopen = () => { log("Connected!", 'sys'); setConnected(true); };
+            dc.onopen = () => { log("DataChannel Open", 'sys'); setConnected(true); };
             dc.onmessage = e => {
-                if(e.data === "SYS:END") doDisconnect(false, "Call ended by FRIEND.");
+                if(e.data === "SYS:END") doDisconnect(false, "Call ended by peer.");
                 else log(e.data, 'peer');
             }
         }
@@ -383,6 +509,7 @@
                 el('remoteVideo').className = 'main-view';
                 el('localVideo').className = 'pip-view';
                 updateVideoVisibility();
+                if(mqClient) { mqClient.end(); mqClient = null; } // Disconnect signaling after P2P
             } else {
                 document.body.classList.remove('connected');
                 el('btnDisconnect').style.display = 'none';
@@ -393,57 +520,25 @@
             }
         }
 
+        // --- UTILS ---
+        async function start() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+                el('localVideo').srcObject = localStream;
+                localStream.getAudioTracks()[0].enabled = true; 
+                localStream.getVideoTracks()[0].enabled = false;
+                updateMediaUI();
+            } catch(e) { log("Media Error: " + e.message, 'sys'); }
+        }
+        
+        async function requestWakeLock() { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} }
+        
         function doDisconnect(notify, reason) {
             if (notify && dc?.readyState === 'open') dc.send("SYS:END");
             if (pc) pc.close();
             pc = null; dc = null;
             setConnected(false);
             log(reason, 'sys');
-            if(wakeLock) { wakeLock.release(); wakeLock = null; }
-        }
-
-        async function validateInput(elem) {
-            const str = elem.value.trim();
-            let isValid = false;
-            try { 
-                await decompress(str); 
-                isValid = true; 
-            } catch(e){}
-            
-            if (str.length > 0 && !isValid) {
-                elem.classList.add('error');
-                if(elem.id === 'hostAnswer') el('btnHostConnect').disabled = true;
-            } else {
-                elem.classList.remove('error');
-                if(elem.id === 'hostAnswer') el('btnHostConnect').disabled = !isValid;
-            }
-            return isValid;
-        }
-
-        function copyToClip(id) { el(id).select(); document.execCommand('copy'); }
-        
-        async function pasteToField(id) {
-            try {
-                const text = await navigator.clipboard.readText();
-                el(id).value = text;
-                if(id === 'hostAnswer') validateInput(el(id));
-                if(id === 'joinOffer') joinCheckOffer();
-            } catch(e) { log("Clipboard blocked.", 'sys'); }
-        }
-
-        function doSend() {
-            const v = el('chatInput').value;
-            if(v && dc?.readyState==='open') { dc.send(v); log(v, 'me'); el('chatInput').value=''; }
-        }
-
-        function log(m, type) {
-            const d = document.createElement('div');
-            const t = new Date().toLocaleTimeString();
-            let n = "SYS", c = "sys", b = "msg-sys";
-            if(type==='me') { n="YOU"; c="me"; b="msg-me"; }
-            if(type==='peer') { n="FRIEND"; c="peer"; b="msg-peer"; }
-            d.innerHTML = `<span style="color:#666">[${t}]</span> <span class="${c}">${n}:</span> <span class="${b}">${m}</span>`;
-            el('chatLog').append(d); el('chatLog').scrollTop = 9999;
         }
 
         function toggleMedia(type) {
@@ -454,15 +549,15 @@
         }
 
         function updateMediaUI() {
-            const v = localStream.getVideoTracks()[0].enabled;
-            const a = localStream.getAudioTracks()[0].enabled;
-            el('btnVideo').className = v ? "media-btn media-on" : "media-btn media-off";
+            const v = localStream && localStream.getVideoTracks()[0].enabled;
+            const a = localStream && localStream.getAudioTracks()[0].enabled;
             el('btnVideo').innerHTML = v ? ICONS.camOn : ICONS.camOff;
-            el('btnAudio').className = a ? "media-btn media-on" : "media-btn media-off";
+            el('btnVideo').className = v ? "media-btn media-on" : "media-btn media-off";
             el('btnAudio').innerHTML = a ? ICONS.micOn : ICONS.micOff;
+            el('btnAudio').className = a ? "media-btn media-on" : "media-btn media-off";
             updateVideoVisibility();
         }
-
+        
         function updateVideoVisibility() {
             const vEnabled = localStream && localStream.getVideoTracks()[0].enabled;
             el('localVideo').style.display = vEnabled ? 'block' : 'none';
@@ -476,10 +571,36 @@
                 el('localVideo').className = isLocalPip ? 'main-view' : 'pip-view';
                 el('remoteVideo').className = isLocalPip ? 'pip-view' : 'main-view';
             } else {
-                const c = el('videoContainer');
-                if(!document.fullscreenElement) c.requestFullscreen().catch(e=>{});
+                if(!document.fullscreenElement) el('videoContainer').requestFullscreen().catch(e=>{});
                 else document.exitFullscreen();
             }
+        }
+
+        function doSend() {
+            const v = el('chatInput').value;
+            if(v && dc?.readyState==='open') { dc.send(v); log(v, 'me'); el('chatInput').value=''; }
+        }
+
+        function log(m, type) {
+            const d = document.createElement('div');
+            const c = type === 'me' ? 'me' : (type === 'peer' ? 'peer' : 'sys');
+            const b = type === 'me' ? 'msg-me' : (type === 'peer' ? 'msg-peer' : 'msg-sys');
+            d.innerHTML = `<span style="color:#666">[${new Date().toLocaleTimeString()}]</span> <span class="${c}">${type.toUpperCase()}:</span> <span class="${b}">${m}</span>`;
+            el('chatLog').append(d); el('chatLog').scrollTop = 9999;
+        }
+
+        // Manual mode helpers
+        function copyToClip(id) { el(id).select(); document.execCommand('copy'); }
+        async function pasteToField(id) {
+            try { el(id).value = await navigator.clipboard.readText(); if(id==='joinOffer') joinCheckOffer(); } catch(e){}
+        }
+        async function validateInput(elem) {
+            try { await decompress(elem.value); el('btnHostConnect').disabled = false; elem.classList.remove('error'); }
+            catch(e) { el('btnHostConnect').disabled = true; elem.classList.add('error'); }
+        }
+        async function joinCheckOffer() {
+            try { await decompress(el('joinOffer').value); el('btnJoinGen').disabled = false; el('joinOffer').classList.remove('error'); }
+            catch(e) { el('btnJoinGen').disabled = true; el('joinOffer').classList.add('error'); }
         }
 
         start();
