@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LibreCall v0.81 (Max NAT)</title>
+    <title>LibreCall v0.82 (Fast)</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#121212">
@@ -178,7 +178,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.81</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.82</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -271,20 +271,15 @@
     </div>
 
     <script>
-        // CONFIG: MASSIVE STUN LIST FOR MAX PENETRATION
+        // CONFIG: BALANCED LIST (Speed + Reliability)
         const config = { 
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun.global.calls.io:3478" },
-                { urls: "stun:stun.miwifi.com:3478" },
-                { urls: "stun:stun.qq.com:3478" },
-                { urls: "stun:stun.chat.bilibili.com:3478" },
-                { urls: "stun:stun.stunprotocol.org:3478" },
-                { urls: "stun:stun.voip.blackberry.com:3478" },
-                { urls: "stun:stun.nextcloud.com:3478" }
+                { urls: "stun:stun1.l.google.com:19302" },
+                { urls: "stun:stun.global.calls.io:3478" }
             ],
-            bundlePolicy: "max-bundle", 
-            iceCandidatePoolSize: 10 // Pre-fetch candidates aggressively
+            // Removed 'max-bundle' to prevent Android audio issues
+            iceCandidatePoolSize: 1
         };
         const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt"; 
 
@@ -458,11 +453,12 @@
             } catch(e) { log("Invalid Code", 'sys'); }
         }
 
-        // --- WEBRTC CORE (v0.81 STUN MAX) ---
+        // --- WEBRTC CORE (v0.82 FAST & COMPATIBLE) ---
         function createPC() {
             if(pc) return;
             pc = new RTCPeerConnection(config);
             
+            // Compatible way to add tracks (works on both Android & iOS)
             if(localStream) {
                 localStream.getTracks().forEach(track => {
                     pc.addTransceiver(track, { streams: [localStream], direction: 'sendrecv' });
@@ -489,11 +485,12 @@
             pc.onicecandidate = e => { 
                 if (!e.candidate) finalizeIce(); 
                 else {
-                    if(e.candidate.type === 'srflx') log("Found Public IP (STUN OK).", 'sys');
+                    if(e.candidate.type === 'srflx') log("Found Public IP.", 'sys');
                 }
             };
-            // INCREASED TIMEOUT to 10s for slow mobile networks
-            setTimeout(() => { if (!iceComplete && pc && pc.localDescription) finalizeIce(); }, 10000); 
+            
+            // REDUCED TIMEOUT: 2 Seconds (For Speed)
+            setTimeout(() => { if (!iceComplete && pc && pc.localDescription) finalizeIce(); }, 2000); 
 
             pc.onconnectionstatechange = () => {
                 if (pc.connectionState === 'connected') setConnected(true);
