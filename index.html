@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LibreCall v0.77 (Soft UI)</title>
+    <title>LibreCall v0.79</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#121212">
@@ -113,21 +113,16 @@
         .btn-blue { background: #007bff; }
         .btn-green { background: #28a745; }
         
-        /* UPDATED RED BUTTON STYLE */
         .btn-red { 
-            background: #a63a3a; /* Soft Burgundy/Brick Red */
+            background: #a63a3a; 
             transition: background 0.2s;
         }
         .btn-red:hover { background: #c04040; }
         
         .btn-grey { background: #444; }
 
-        /* SPECIFIC DISCONNECT BUTTON STYLE */
         #btnDisconnect {
-            height: 60px; /* Taller */
-            font-size: 18px; /* Larger Text */
-            margin-bottom: 10px; /* Spacing */
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            height: 60px; font-size: 18px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
         #chatLog {
@@ -183,7 +178,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.77</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.79</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -276,7 +271,16 @@
     </div>
 
     <script>
-        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        // CONFIG: STUN servers for robust mobile/iOS connection
+        const config = { 
+            iceServers: [
+                { urls: "stun:stun.l.google.com:19302" },
+                { urls: "stun:stun1.l.google.com:19302" },
+                { urls: "stun:stun2.l.google.com:19302" },
+                { urls: "stun:stun3.l.google.com:19302" },
+                { urls: "stun:stun4.l.google.com:19302" }
+            ] 
+        };
         const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt"; 
 
         const el = id => document.getElementById(id);
@@ -449,20 +453,32 @@
             } catch(e) { log("Invalid Code", 'sys'); }
         }
 
-        // --- WEBRTC ---
+        // --- WEBRTC CORE (IOS FIXED) ---
         function createPC() {
             if(pc) return;
             pc = new RTCPeerConnection(config);
-            if(localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
             
+            // IOS FIX: Explicitly add Transceivers with 'sendrecv'
+            if(localStream) {
+                localStream.getTracks().forEach(track => {
+                    pc.addTransceiver(track, { streams: [localStream], direction: 'sendrecv' });
+                });
+            }
+
             pc.ondatachannel = e => {
                 log("DataChannel received via P2P.", 'sys');
                 setupDC(e.channel);
             };
 
             pc.ontrack = e => {
-                el('remoteVideo').srcObject = e.streams[0];
-                el('remoteVideo').play().catch(e=>console.log(e));
+                log("Remote Track received", 'sys');
+                const v = el('remoteVideo');
+                v.srcObject = e.streams[0];
+                v.setAttribute("playsinline", "true"); // Force playsinline
+                v.play().catch(err => {
+                    log("Auto-play blocked. Tap screen.", 'sys');
+                    document.body.addEventListener('click', () => v.play(), {once:true});
+                });
             };
             
             iceComplete = false;
@@ -471,6 +487,7 @@
 
             pc.onconnectionstatechange = () => {
                 if (pc.connectionState === 'connected') setConnected(true);
+                if (pc.connectionState === 'failed') log("P2P Connection Failed (Likely NAT)", 'sys');
             };
         }
 
