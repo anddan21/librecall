@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LibreCall v0.83 (Deep Gather)</title>
+    <title>LibreCall v0.77 (Soft UI)</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#121212">
@@ -113,16 +113,21 @@
         .btn-blue { background: #007bff; }
         .btn-green { background: #28a745; }
         
+        /* UPDATED RED BUTTON STYLE */
         .btn-red { 
-            background: #a63a3a; 
+            background: #a63a3a; /* Soft Burgundy/Brick Red */
             transition: background 0.2s;
         }
         .btn-red:hover { background: #c04040; }
         
         .btn-grey { background: #444; }
 
+        /* SPECIFIC DISCONNECT BUTTON STYLE */
         #btnDisconnect {
-            height: 60px; font-size: 18px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            height: 60px; /* Taller */
+            font-size: 18px; /* Larger Text */
+            margin-bottom: 10px; /* Spacing */
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
         #chatLog {
@@ -178,7 +183,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.83</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.77</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -271,18 +276,7 @@
     </div>
 
     <script>
-        // CONFIG: Robust STUN list, but focused on reliability
-        const config = { 
-            iceServers: [
-                { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun1.l.google.com:19302" },
-                { urls: "stun:stun.global.calls.io:3478" },
-                { urls: "stun:stun.voip.blackberry.com:3478" }
-            ],
-            // 'max-bundle' allows using a single port for all media (best for mobile NAT)
-            bundlePolicy: "max-bundle", 
-            iceCandidatePoolSize: 2
-        };
+        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
         const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt"; 
 
         const el = id => document.getElementById(id);
@@ -297,7 +291,6 @@
         let isHost = false, isConnected = false, isAuto = false;
         let iceComplete = false, wakeLock = null;
         let currentRoom = "";
-        let candidateCount = 0;
 
         // --- HELPERS ---
         async function compress(str) {
@@ -354,6 +347,8 @@
                 el('roomCode').readOnly = true;
                 el('autoTitle').innerText = "Share this Code";
                 el('btnAutoConnect').style.display = 'none';
+                el('btnCopy').style.display = 'block';
+                el('btnPaste').style.display = 'none';
                 log(`Starting as HOST. Room: ${currentRoom}.`, 'sys');
                 connectMQTT(); 
             } else {
@@ -361,6 +356,8 @@
                 el('roomCode').readOnly = false;
                 el('autoTitle').innerText = "Enter Host Code";
                 el('btnAutoConnect').style.display = 'block';
+                el('btnCopy').style.display = 'none';
+                el('btnPaste').style.display = 'block';
                 log("Selected JOIN. Waiting for code...", 'sys');
             }
         }
@@ -452,61 +449,28 @@
             } catch(e) { log("Invalid Code", 'sys'); }
         }
 
-        // --- WEBRTC CORE (v0.83 DEEP GATHER) ---
+        // --- WEBRTC ---
         function createPC() {
             if(pc) return;
             pc = new RTCPeerConnection(config);
-            candidateCount = 0;
+            if(localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
             
-            if(localStream) {
-                localStream.getTracks().forEach(track => {
-                    pc.addTransceiver(track, { streams: [localStream], direction: 'sendrecv' });
-                });
-            }
-
             pc.ondatachannel = e => {
                 log("DataChannel received via P2P.", 'sys');
                 setupDC(e.channel);
             };
 
             pc.ontrack = e => {
-                log("Remote Track received", 'sys');
-                const v = el('remoteVideo');
-                v.srcObject = e.streams[0];
-                v.setAttribute("playsinline", "true"); 
-                v.play().catch(err => {
-                    log("Tap screen to see video.", 'sys');
-                    document.body.addEventListener('click', () => v.play(), {once:true});
-                });
+                el('remoteVideo').srcObject = e.streams[0];
+                el('remoteVideo').play().catch(e=>console.log(e));
             };
             
             iceComplete = false;
-            
-            // LOGIC CHANGE: Wait for candidates eagerly
-            pc.onicecandidate = e => { 
-                if (!e.candidate) {
-                    // Browser says: "I am done gathering"
-                    log(`Gathering complete. Total candidates: ${candidateCount}`, 'sys');
-                    finalizeIce(); 
-                } else {
-                    candidateCount++;
-                    if(e.candidate.type === 'srflx') log(`Found Public IP. (Count: ${candidateCount})`, 'sys');
-                    else if(candidateCount % 5 === 0) log(`Gathering... (${candidateCount} found)`, 'sys');
-                }
-            };
-            
-            // Backup Timer: In case 'complete' never fires (some browsers bug out)
-            // 5 seconds is a safe upper limit for mobile
-            setTimeout(() => { 
-                if (!iceComplete && pc && pc.localDescription) {
-                    log("Force finalizing (Time limit reached).", 'sys');
-                    finalizeIce(); 
-                }
-            }, 5000); 
+            pc.onicecandidate = e => { if (!e.candidate) finalizeIce(); };
+            setTimeout(() => { if (!iceComplete && pc && pc.localDescription) finalizeIce(); }, 3000); 
 
             pc.onconnectionstatechange = () => {
                 if (pc.connectionState === 'connected') setConnected(true);
-                if (pc.connectionState === 'failed') log("P2P Failed. NAT blocked connection.", 'sys');
             };
         }
 
@@ -515,15 +479,8 @@
             iceComplete = true;
             
             if (isAuto) {
-                if(isHost) {
-                    log("Sending Offer (with Public IPs)...", 'sys');
-                    publishSig('offer', pc.localDescription);
-                    el('btnCopy').style.display = 'block'; // Host gets Copy btn
-                } else {
-                    log("Sending Answer (with Public IPs)...", 'sys');
-                    publishSig('answer', pc.localDescription);
-                    el('btnPaste').style.display = 'block'; // Guest gets Paste btn (rarely needed in auto)
-                }
+                if(isHost) publishSig('offer', pc.localDescription);
+                else publishSig('answer', pc.localDescription);
             } else {
                 const json = JSON.stringify(pc.localDescription);
                 const code = await compress(json);
