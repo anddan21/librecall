@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LibreCall v0.79</title>
+    <title>LibreCall v0.80</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#121212">
@@ -178,7 +178,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.79</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.80</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -271,15 +271,15 @@
     </div>
 
     <script>
-        // CONFIG: STUN servers for robust mobile/iOS connection
+        // CONFIG: Aggressive NAT Traversal Settings
         const config = { 
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun1.l.google.com:19302" },
-                { urls: "stun:stun2.l.google.com:19302" },
-                { urls: "stun:stun3.l.google.com:19302" },
-                { urls: "stun:stun4.l.google.com:19302" }
-            ] 
+                { urls: "stun:stun.global.calls.io:3478" }, // Port 3478 (Better for corp/mobile NAT)
+                { urls: "stun:stun.voip.blackberry.com:3478" } // Robust backup
+            ],
+            bundlePolicy: "max-bundle", // CRITICAL for iOS to reduce ports
+            iceCandidatePoolSize: 2
         };
         const MQTT_BROKER = "wss://broker.emqx.io:8084/mqtt"; 
 
@@ -453,12 +453,11 @@
             } catch(e) { log("Invalid Code", 'sys'); }
         }
 
-        // --- WEBRTC CORE (IOS FIXED) ---
+        // --- WEBRTC CORE (v0.80 STUN MAX) ---
         function createPC() {
             if(pc) return;
             pc = new RTCPeerConnection(config);
             
-            // IOS FIX: Explicitly add Transceivers with 'sendrecv'
             if(localStream) {
                 localStream.getTracks().forEach(track => {
                     pc.addTransceiver(track, { streams: [localStream], direction: 'sendrecv' });
@@ -474,20 +473,26 @@
                 log("Remote Track received", 'sys');
                 const v = el('remoteVideo');
                 v.srcObject = e.streams[0];
-                v.setAttribute("playsinline", "true"); // Force playsinline
+                v.setAttribute("playsinline", "true"); 
                 v.play().catch(err => {
-                    log("Auto-play blocked. Tap screen.", 'sys');
+                    log("Tap screen to see video.", 'sys');
                     document.body.addEventListener('click', () => v.play(), {once:true});
                 });
             };
             
             iceComplete = false;
-            pc.onicecandidate = e => { if (!e.candidate) finalizeIce(); };
-            setTimeout(() => { if (!iceComplete && pc && pc.localDescription) finalizeIce(); }, 3000); 
+            pc.onicecandidate = e => { 
+                if (!e.candidate) finalizeIce(); 
+                else {
+                    // DEBUG: User sees if they have a public IP
+                    if(e.candidate.type === 'srflx') log("Found Public IP (STUN OK).", 'sys');
+                }
+            };
+            setTimeout(() => { if (!iceComplete && pc && pc.localDescription) finalizeIce(); }, 5000); 
 
             pc.onconnectionstatechange = () => {
                 if (pc.connectionState === 'connected') setConnected(true);
-                if (pc.connectionState === 'failed') log("P2P Connection Failed (Likely NAT)", 'sys');
+                if (pc.connectionState === 'failed') log("P2P Failed. Mobile NAT is too strict.", 'sys');
             };
         }
 
