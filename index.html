@@ -183,7 +183,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.95</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.96</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -684,7 +684,6 @@
         async function validateInput(elem) { try { await decompress(elem.value); el('btnHostConnect').disabled = false; } catch(e) { el('btnHostConnect').disabled = true; } }
         async function joinCheckOffer() { try { await decompress(el('joinOffer').value); el('btnJoinGen').disabled = false; } catch(e) { el('btnJoinGen').disabled = true; } }
 
-        start();
     </script>
 </body>
 </html>
