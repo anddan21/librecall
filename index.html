@@ -93,6 +93,7 @@
         }
         input.room-input:focus { outline: none; border-color: #007bff; }
         input.room-input[readonly] { background: #1a1a1a; color: #00ff9d; border-color: #00ff9d; cursor: not-allowed; }
+        input.room-input.error { border-color: #dc3545; background: #2a1a1a; }
 
         button.action-btn {
             width: 100%; padding: 12px; border: none; border-radius: 8px;
@@ -112,13 +113,8 @@
         
         .btn-blue { background: #007bff; }
         .btn-green { background: #28a745; }
-        
-        .btn-red { 
-            background: #a63a3a; 
-            transition: background 0.2s;
-        }
+        .btn-red { background: #a63a3a; transition: background 0.2s; }
         .btn-red:hover { background: #c04040; }
-        
         .btn-grey { background: #444; }
 
         #btnDisconnect {
@@ -159,7 +155,6 @@
         
         .main-view { width: 100%; height: 100%; object-fit: contain; position: absolute; z-index: 1; }
         
-        /* PIP - Default (Desktop) - 20% width */
         .pip-view { 
             width: 20%; aspect-ratio: 16/9; object-fit: cover; 
             position: absolute; bottom: 15px; right: 15px; z-index: 10;
@@ -168,21 +163,12 @@
             transition: all 0.3s ease;
         }
 
-        /* PIP - Mobile Portrait - 22% width (Smaller than v0.86) */
         @media (orientation: portrait) {
-            .pip-view {
-                width: 22%; 
-                aspect-ratio: 9/16; 
-            }
+            .pip-view { width: 22%; aspect-ratio: 9/16; }
         }
 
-        /* PIP - Fullscreen Overrides - Allow it to be slightly larger for visibility */
         .video-stage:fullscreen .pip-view { width: 25%; }
-        @media (orientation: portrait) {
-            .video-stage:fullscreen .pip-view { width: 25%; }
-        }
-        
-        /* Webkit Fullscreen support */
+        @media (orientation: portrait) { .video-stage:fullscreen .pip-view { width: 25%; } }
         .video-stage:-webkit-full-screen .pip-view { width: 25%; }
 
         body.connected .controls > :not(#chatLog, .chat-row, .media-row, #btnDisconnect) { display: none !important; }
@@ -192,14 +178,12 @@
             font-size: 14px; text-align: center; color: #00bfff; 
             margin-top: 10px; font-weight: 600; animation: pulse 2s infinite;
         }
-        @keyframes pulse {
-            0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; }
-        }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.87</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.88</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -217,7 +201,7 @@
                 <div class="step-box step-active">
                     <div class="step-title" id="autoTitle">Room Code</div>
                     <div class="input-group">
-                        <input id="roomCode" class="room-input" placeholder="____" maxlength="6" oninput="this.value=this.value.toUpperCase()">
+                        <input id="roomCode" class="room-input" placeholder="____" maxlength="4" oninput="validateRoomInput(this)">
                         <button id="btnCopy" class="side-btn" style="display:none" onclick="copyToClip('roomCode')">COPY</button>
                         <button id="btnPaste" class="side-btn" style="display:none" onclick="pasteToField('roomCode')">PASTE</button>
                     </div>
@@ -271,7 +255,7 @@
             </div>
         </div>
 
-        <button id="btnDisconnect" class="action-btn btn-red" style="display:none" onclick="doDisconnect(true, 'Call ended by YOU.')">DISCONNECT</button>
+        <button id="btnDisconnect" class="action-btn btn-red" style="display:none" onclick="disconnectAndReset()">DISCONNECT</button>
 
         <div id="chatLog"></div>
         <div class="chat-row">
@@ -307,8 +291,8 @@
         let isHost = false, isConnected = false, isAuto = false;
         let iceComplete = false, wakeLock = null;
         let currentRoom = "";
+        let connectTimeout = null;
 
-        // --- HELPERS ---
         async function compress(str) {
             const stream = new Blob([str]).stream().pipeThrough(new CompressionStream("gzip"));
             return btoa(String.fromCharCode(...new Uint8Array(await new Response(stream).arrayBuffer())));
@@ -320,7 +304,6 @@
             return await new Response(stream).text();
         }
 
-        // --- UI ---
         function switchTab(tab) {
             if(isConnected) return;
             resetApp("Switched mode");
@@ -342,14 +325,21 @@
             document.querySelectorAll('.mode-selector').forEach(m => m.style.display = 'flex');
             ['hostOffer','hostAnswer','joinOffer','joinAnswer','roomCode'].forEach(i => { if(el(i)) el(i).value = ''; });
             el('mqttStatus').innerText = "Not connected";
+            el('mqttStatus').style.color = "#00bfff";
             el('joinStep2').style.opacity = '0.5';
             el('btnCopy').style.display = 'none';
             el('btnPaste').style.display = 'none';
             if(mqClient) { mqClient.end(); mqClient = null; log("MQTT Disconnected.", 'sys'); }
             if(wakeLock) { wakeLock.release(); wakeLock = null; }
+            if(connectTimeout) clearTimeout(connectTimeout);
         }
 
-        // --- AUTO MODE ---
+        // NEW: Handles seamless disconnect and UI reset
+        function disconnectAndReset() {
+            doDisconnect(true, "Call ended by YOU.");
+            setTimeout(() => resetApp("Ready for new call."), 200);
+        }
+
         function startAuto(role) {
             isAuto = true;
             isHost = (role === 'host');
@@ -375,16 +365,46 @@
                 el('btnCopy').style.display = 'none';
                 el('btnPaste').style.display = 'block';
                 log("Selected JOIN. Waiting for code...", 'sys');
+                
+                // NEW: Auto-focus the input for Guest
+                setTimeout(() => el('roomCode').focus(), 100);
+            }
+        }
+
+        // NEW: Validates input on the fly
+        function validateRoomInput(input) {
+            input.value = input.value.toUpperCase();
+            if (input.value.length === 4) {
+                input.classList.remove('error');
             }
         }
 
         function connectMQTT() {
             if(!isHost) currentRoom = el('roomCode').value.toUpperCase().trim();
-            if(currentRoom.length < 3) return alert("Invalid Code");
+            
+            // NEW: Strict length check
+            if(currentRoom.length !== 4) {
+                el('roomCode').classList.add('error');
+                return log("Error: Code must be 4 characters.", 'sys');
+            }
+
             if(!isHost) {
                 el('btnAutoConnect').disabled = true;
                 el('btnAutoConnect').innerText = "CONNECTING...";
+                
+                // NEW: Connection timeout
+                connectTimeout = setTimeout(() => {
+                    if(!isConnected) {
+                        log("Error: Peer not found. Check code.", 'sys');
+                        el('mqttStatus').innerText = "Peer not found.";
+                        el('mqttStatus').style.color = "#dc3545";
+                        el('btnAutoConnect').disabled = false;
+                        el('btnAutoConnect').innerText = "CONNECT";
+                        if(mqClient) mqClient.end();
+                    }
+                }, 15000); // 15s timeout
             }
+            
             el('mqttStatus').innerText = "Network Connected. Waiting for peer...";
             
             const clientId = 'lc_' + Math.random().toString(16).substr(2, 8);
@@ -400,6 +420,9 @@
             mqClient.on('message', async (topic, message) => {
                 const msg = JSON.parse(message.toString());
                 if(msg.sender === clientId) return; 
+
+                // If we get a message, clear timeout
+                if(connectTimeout) clearTimeout(connectTimeout);
 
                 if(msg.type === 'join' && isHost) {
                     el('mqttStatus').innerText = "Peer found! Initializing...";
@@ -430,7 +453,6 @@
             mqClient.publish(targetTopic, JSON.stringify({ type: type, data: data, sender: mqClient.options.clientId }));
         }
 
-        // --- MANUAL MODE ---
         function selectManual(mode) {
             isAuto = false;
             el('uiManual').querySelector('.mode-selector').style.display = 'none';
@@ -457,7 +479,6 @@
 
         async function joinGenerate() {
             createPC();
-            // Bug Fix v0.76 logic retained: Always setupDC on manual join
             pc.ondatachannel = e => {
                 log("DataChannel received via P2P.", 'sys');
                 setupDC(e.channel);
@@ -470,13 +491,11 @@
             } catch(e) { log("Invalid Code", 'sys'); }
         }
 
-        // --- WEBRTC CORE (v0.77 Logic + contain fix) ---
         function createPC() {
             if(pc) return;
             pc = new RTCPeerConnection(config);
             if(localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
             
-            // v0.76 FIX: Always listen for DataChannel!
             pc.ondatachannel = e => {
                 log("DataChannel received via P2P.", 'sys');
                 setupDC(e.channel);
@@ -521,7 +540,7 @@
             dc = channel;
             dc.onopen = () => { log("Secure Chat Ready.", 'sys'); setConnected(true); };
             dc.onmessage = e => {
-                if(e.data === "SYS:END") doDisconnect(false, "Call ended by peer.");
+                if(e.data === "SYS:END") disconnectAndReset(); // If peer disconnects, we reset too
                 else log(e.data, 'peer');
             }
         }
@@ -537,6 +556,7 @@
                 el('localVideo').className = 'pip-view';
                 updateVideoVisibility();
                 if(mqClient) { mqClient.end(); mqClient = null; }
+                if(connectTimeout) clearTimeout(connectTimeout);
             } else {
                 document.body.classList.remove('connected');
                 el('btnDisconnect').style.display = 'none';
@@ -547,7 +567,6 @@
             }
         }
 
-        // --- UTILS ---
         async function start() {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
@@ -607,7 +626,6 @@
 
         function doSend() {
             const v = el('chatInput').value;
-            // v0.76 FIX: check dc existence properly
             if(v && dc && dc.readyState==='open') { dc.send(v); log(v, 'me'); el('chatInput').value=''; }
             else if(v) log("Error: Chat not connected yet.", 'sys');
         }
