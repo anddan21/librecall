@@ -94,12 +94,18 @@
         input.room-input:focus { outline: none; border-color: #007bff; }
         input.room-input[readonly] { background: #1a1a1a; color: #00ff9d; border-color: #00ff9d; cursor: not-allowed; }
         input.room-input.error { border-color: #dc3545; background: #2a1a1a; }
+        input.room-input:disabled { background: #1a1a1a; color: #666; border-color: #333; cursor: not-allowed; }
 
         button.action-btn {
             width: 100%; padding: 12px; border: none; border-radius: 8px;
             font-weight: 600; color: white; cursor: pointer; text-transform: uppercase;
         }
-        button.action-btn:disabled { background: #333 !important; color: #666; cursor: not-allowed; }
+        button.action-btn:disabled { 
+            background: #333 !important; 
+            color: #555 !important; 
+            cursor: not-allowed; 
+            opacity: 0.7;
+        }
         
         button.side-btn {
             width: 90px; padding: 0; border: none; border-radius: 6px;
@@ -110,6 +116,7 @@
         }
         button.side-btn:hover { background: #555; }
         button.side-btn:active { transform: scale(0.98); }
+        button.side-btn:disabled { background: #222; color: #555; cursor: not-allowed; }
         
         .btn-blue { background: #007bff; }
         .btn-green { background: #28a745; }
@@ -183,7 +190,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.96</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.100</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -206,9 +213,9 @@
                         <button id="btnPaste" class="side-btn" style="display:none" onclick="pasteToField('roomCode')">PASTE</button>
                     </div>
                     <div id="mqttStatus" class="mqtt-status">Not connected</div>
-                    <button id="btnAutoConnect" class="action-btn btn-green" style="margin-top:10px; display:none" onclick="connectMQTT()">CONNECT</button>
+                    <button id="btnAutoConnect" class="action-btn btn-green" style="margin-top:10px; display:none" onclick="connectMQTT()" disabled>CONNECT</button>
                 </div>
-                <button class="action-btn btn-grey" onclick="resetApp()">CANCEL</button>
+                <button class="action-btn btn-grey" onclick="fullReset()">CANCEL</button>
             </div>
         </div>
 
@@ -233,7 +240,7 @@
                     </div>
                     <button id="btnHostConnect" class="action-btn btn-green" style="margin-top:10px" onclick="hostConnectManual()" disabled>CONNECT</button>
                 </div>
-                <button class="action-btn btn-grey" onclick="resetApp()">CANCEL</button>
+                <button class="action-btn btn-grey" onclick="fullReset()">CANCEL</button>
             </div>
             <div id="joinPanel" class="panel">
                 <div class="step-box step-wait">
@@ -251,7 +258,7 @@
                         <button class="side-btn" onclick="copyToClip('joinAnswer')">COPY</button>
                     </div>
                 </div>
-                <button class="action-btn btn-grey" onclick="resetApp()">CANCEL</button>
+                <button class="action-btn btn-grey" onclick="fullReset()">CANCEL</button>
             </div>
         </div>
 
@@ -335,10 +342,14 @@
             if(connectTimeout) clearTimeout(connectTimeout);
         }
 
+        function fullReset() {
+            window.location.reload();
+        }
+
         function disconnectAndReset(isRemote) {
             const msg = isRemote ? "Call ended by PEER." : "Call ended by YOU.";
             doDisconnect(!isRemote, msg);
-            setTimeout(() => resetApp(), 200); 
+            setTimeout(() => fullReset(), 200); 
         }
 
         function stopMedia() {
@@ -347,7 +358,7 @@
                 localStream = null;
                 el('localVideo').srcObject = null;
             }
-            updateMediaUI(); // Force update UI after clearing stream
+            updateMediaUI(); 
         }
 
         async function initMedia() {
@@ -392,6 +403,8 @@
                 el('roomCode').readOnly = false;
                 el('autoTitle').innerText = "Enter Host Code";
                 el('btnAutoConnect').style.display = 'block';
+                el('btnAutoConnect').disabled = true; 
+                
                 el('btnCopy').style.display = 'none';
                 el('btnPaste').style.display = 'block';
                 log("Selected JOIN. Waiting for code...", 'sys');
@@ -401,8 +414,13 @@
 
         function validateRoomInput(input) {
             input.value = input.value.toUpperCase();
+            const btn = el('btnAutoConnect');
+            
             if (input.value.length === 4) {
                 input.classList.remove('error');
+                btn.disabled = false;
+            } else {
+                btn.disabled = true;
             }
         }
 
@@ -417,17 +435,8 @@
             if(!isHost) {
                 el('btnAutoConnect').disabled = true;
                 el('btnAutoConnect').innerText = "CONNECTING...";
-                
-                connectTimeout = setTimeout(() => {
-                    if(!isConnected) {
-                        log("Error: Peer not found. Check code.", 'sys');
-                        el('mqttStatus').innerText = "Peer not found.";
-                        el('mqttStatus').style.color = "#dc3545";
-                        el('btnAutoConnect').disabled = false;
-                        el('btnAutoConnect').innerText = "CONNECT";
-                        if(mqClient) mqClient.end();
-                    }
-                }, 15000); 
+                el('roomCode').disabled = true;  
+                el('btnPaste').disabled = true; 
             }
             
             el('mqttStatus').innerText = "Network Connected. Waiting for peer...";
@@ -469,6 +478,10 @@
                  log("MQTT Error: " + err.message, 'sys');
                  el('mqttStatus').innerText = "Network Error.";
                  el('mqttStatus').style.color = "#dc3545";
+                 el('roomCode').disabled = false;
+                 el('btnPaste').disabled = false;
+                 el('btnAutoConnect').disabled = false;
+                 el('btnAutoConnect').innerText = "CONNECT";
              });
         }
 
@@ -528,8 +541,15 @@
             };
 
             pc.ontrack = e => {
-                el('remoteVideo').srcObject = e.streams[0];
-                el('remoteVideo').play().catch(e=>console.log(e));
+                const v = el('remoteVideo');
+                // FIX: Check if stream changed before playing to avoid AbortError
+                if (v.srcObject !== e.streams[0]) {
+                    v.srcObject = e.streams[0];
+                    v.play().catch(e => {
+                        // FIX: Suppress AbortError logs
+                        if (e.name !== 'AbortError') console.error(e);
+                    });
+                }
             };
             
             iceComplete = false;
@@ -564,7 +584,7 @@
 
         function setupDC(channel) {
             dc = channel;
-            dc.onopen = () => { log("Secure Chat Ready.", 'sys'); setConnected(true); };
+            dc.onopen = () => { log("Connection established. Happy Libre Call!", 'sys'); setConnected(true); };
             dc.onmessage = e => {
                 if(e.data === "SYS:END") disconnectAndReset(true); 
                 else log(e.data, 'peer');
@@ -611,9 +631,7 @@
             log(`${type==='video'?'Video':'Audio'} ${tr.enabled ? 'ON' : 'OFF'}.`, 'sys');
         }
 
-        // FIXED: CLEAN UI - NO ICONS WHEN DISCONNECTED
         function updateMediaUI() {
-            // If NO stream (Initial State or Disconnected) -> Empty Buttons
             if (!localStream) {
                 el('btnVideo').innerHTML = '';
                 el('btnVideo').className = "media-btn media-off";
@@ -623,7 +641,6 @@
                 return;
             }
 
-            // If Stream Exists -> Show Icons (Crossed out if disabled)
             const v = localStream.getVideoTracks()[0].enabled;
             const a = localStream.getAudioTracks()[0].enabled;
             
@@ -677,6 +694,7 @@
             try { 
                 const text = await navigator.clipboard.readText();
                 el(id).value = text; 
+                if(id==='roomCode') validateRoomInput(el(id));
                 if(id==='joinOffer') joinCheckOffer(); 
                 if(id==='hostAnswer') validateInput(el(id));
             } catch(e){ log("Paste failed.", 'sys'); }
