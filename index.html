@@ -183,7 +183,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.92</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.95</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -321,7 +321,7 @@
 
         function resetApp(reason=null) {
             doDisconnect(false, reason);
-            stopMedia(); // Full Stop
+            stopMedia(); 
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('visible'));
             document.querySelectorAll('.mode-selector').forEach(m => m.style.display = 'flex');
             ['hostOffer','hostAnswer','joinOffer','joinAnswer','roomCode'].forEach(i => { if(el(i)) el(i).value = ''; });
@@ -347,12 +347,12 @@
                 localStream = null;
                 el('localVideo').srcObject = null;
             }
-            updateMediaUI();
+            updateMediaUI(); // Force update UI after clearing stream
         }
 
         async function initMedia() {
             try {
-                if(localStream) return true; // Already active
+                if(localStream) return true; 
                 log("Requesting media access...", 'sys');
                 localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
                 el('localVideo').srcObject = localStream;
@@ -369,7 +369,7 @@
         }
 
         async function startAuto(role) {
-            if(!await initMedia()) return; // Init devices first
+            if(!await initMedia()) return; 
 
             isAuto = true;
             isHost = (role === 'host');
@@ -478,7 +478,7 @@
         }
 
         async function selectManual(mode) {
-            if(!await initMedia()) return; // Init devices first
+            if(!await initMedia()) return; 
 
             isAuto = false;
             el('uiManual').querySelector('.mode-selector').style.display = 'none';
@@ -611,13 +611,28 @@
             log(`${type==='video'?'Video':'Audio'} ${tr.enabled ? 'ON' : 'OFF'}.`, 'sys');
         }
 
+        // FIXED: CLEAN UI - NO ICONS WHEN DISCONNECTED
         function updateMediaUI() {
-            const v = localStream && localStream.getVideoTracks()[0].enabled;
-            const a = localStream && localStream.getAudioTracks()[0].enabled;
+            // If NO stream (Initial State or Disconnected) -> Empty Buttons
+            if (!localStream) {
+                el('btnVideo').innerHTML = '';
+                el('btnVideo').className = "media-btn media-off";
+                el('btnAudio').innerHTML = '';
+                el('btnAudio').className = "media-btn media-off";
+                updateVideoVisibility();
+                return;
+            }
+
+            // If Stream Exists -> Show Icons (Crossed out if disabled)
+            const v = localStream.getVideoTracks()[0].enabled;
+            const a = localStream.getAudioTracks()[0].enabled;
+            
             el('btnVideo').innerHTML = v ? ICONS.camOn : ICONS.camOff;
             el('btnVideo').className = v ? "media-btn media-on" : "media-btn media-off";
+            
             el('btnAudio').innerHTML = a ? ICONS.micOn : ICONS.micOff;
             el('btnAudio').className = a ? "media-btn media-on" : "media-btn media-off";
+            
             updateVideoVisibility();
         }
         
@@ -669,7 +684,7 @@
         async function validateInput(elem) { try { await decompress(elem.value); el('btnHostConnect').disabled = false; } catch(e) { el('btnHostConnect').disabled = true; } }
         async function joinCheckOffer() { try { await decompress(el('joinOffer').value); el('btnJoinGen').disabled = false; } catch(e) { el('btnJoinGen').disabled = true; } }
 
-        // Start is now implicit via button clicks, no auto-start.
+        start();
     </script>
 </body>
 </html>
