@@ -141,7 +141,6 @@
         }
         .media-btn svg { width: 24px; fill: #fff; }
         .media-on { background: #28a745; }
-        /* CHANGED: Neutral gray background for OFF state */
         .media-off { background: #444; } 
 
         .video-stage {
@@ -184,7 +183,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.91</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.92</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -307,7 +306,7 @@
 
         function switchTab(tab) {
             if(isConnected) return;
-            resetApp(); // Silent reset
+            resetApp(); 
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
             
@@ -322,6 +321,7 @@
 
         function resetApp(reason=null) {
             doDisconnect(false, reason);
+            stopMedia(); // Full Stop
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('visible'));
             document.querySelectorAll('.mode-selector').forEach(m => m.style.display = 'flex');
             ['hostOffer','hostAnswer','joinOffer','joinAnswer','roomCode'].forEach(i => { if(el(i)) el(i).value = ''; });
@@ -338,10 +338,39 @@
         function disconnectAndReset(isRemote) {
             const msg = isRemote ? "Call ended by PEER." : "Call ended by YOU.";
             doDisconnect(!isRemote, msg);
-            setTimeout(() => resetApp(), 200); // Silent reset
+            setTimeout(() => resetApp(), 200); 
         }
 
-        function startAuto(role) {
+        function stopMedia() {
+            if(localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+                el('localVideo').srcObject = null;
+            }
+            updateMediaUI();
+        }
+
+        async function initMedia() {
+            try {
+                if(localStream) return true; // Already active
+                log("Requesting media access...", 'sys');
+                localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+                el('localVideo').srcObject = localStream;
+                localStream.getAudioTracks()[0].enabled = true; 
+                localStream.getVideoTracks()[0].enabled = false;
+                updateMediaUI();
+                log("Media initialized.", 'sys');
+                return true;
+            } catch(e) { 
+                log("Media Error: " + e.message, 'sys'); 
+                alert("Microphone/Camera access required to call!");
+                return false;
+            }
+        }
+
+        async function startAuto(role) {
+            if(!await initMedia()) return; // Init devices first
+
             isAuto = true;
             isHost = (role === 'host');
             el('uiAuto').querySelector('.mode-selector').style.display = 'none';
@@ -366,7 +395,6 @@
                 el('btnCopy').style.display = 'none';
                 el('btnPaste').style.display = 'block';
                 log("Selected JOIN. Waiting for code...", 'sys');
-                
                 setTimeout(() => el('roomCode').focus(), 100);
             }
         }
@@ -449,7 +477,9 @@
             mqClient.publish(targetTopic, JSON.stringify({ type: type, data: data, sender: mqClient.options.clientId }));
         }
 
-        function selectManual(mode) {
+        async function selectManual(mode) {
+            if(!await initMedia()) return; // Init devices first
+
             isAuto = false;
             el('uiManual').querySelector('.mode-selector').style.display = 'none';
             if (mode === 'host') {
@@ -563,17 +593,6 @@
             }
         }
 
-        async function start() {
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
-                el('localVideo').srcObject = localStream;
-                localStream.getAudioTracks()[0].enabled = true; 
-                localStream.getVideoTracks()[0].enabled = false;
-                updateMediaUI();
-                log("Media Ready. Mic ON, Camera OFF.", 'sys');
-            } catch(e) { log("Media Error: " + e.message, 'sys'); }
-        }
-        
         async function requestWakeLock() { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} }
         
         function doDisconnect(notify, reason) {
@@ -581,7 +600,7 @@
             if (pc) pc.close();
             pc = null; dc = null;
             setConnected(false);
-            if (reason) log(reason, 'sys'); // Only log if reason provided
+            if (reason) log(reason, 'sys'); 
         }
 
         function toggleMedia(type) {
@@ -643,7 +662,6 @@
             try { 
                 const text = await navigator.clipboard.readText();
                 el(id).value = text; 
-                // Log removed
                 if(id==='joinOffer') joinCheckOffer(); 
                 if(id==='hostAnswer') validateInput(el(id));
             } catch(e){ log("Paste failed.", 'sys'); }
@@ -651,7 +669,7 @@
         async function validateInput(elem) { try { await decompress(elem.value); el('btnHostConnect').disabled = false; } catch(e) { el('btnHostConnect').disabled = true; } }
         async function joinCheckOffer() { try { await decompress(el('joinOffer').value); el('btnJoinGen').disabled = false; } catch(e) { el('btnJoinGen').disabled = true; } }
 
-        start();
+        // Start is now implicit via button clicks, no auto-start.
     </script>
 </body>
 </html>
