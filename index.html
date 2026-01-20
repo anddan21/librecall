@@ -141,7 +141,8 @@
         }
         .media-btn svg { width: 24px; fill: #fff; }
         .media-on { background: #28a745; }
-        .media-off { background: #d32f2f; }
+        /* CHANGED: Neutral gray background for OFF state */
+        .media-off { background: #444; } 
 
         .video-stage {
             position: relative; width: 95%; max-width: 800px;
@@ -183,7 +184,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.88</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.91</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -255,7 +256,7 @@
             </div>
         </div>
 
-        <button id="btnDisconnect" class="action-btn btn-red" style="display:none" onclick="disconnectAndReset()">DISCONNECT</button>
+        <button id="btnDisconnect" class="action-btn btn-red" style="display:none" onclick="disconnectAndReset(false)">DISCONNECT</button>
 
         <div id="chatLog"></div>
         <div class="chat-row">
@@ -306,7 +307,7 @@
 
         function switchTab(tab) {
             if(isConnected) return;
-            resetApp("Switched mode");
+            resetApp(); // Silent reset
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
             
@@ -319,7 +320,7 @@
             }
         }
 
-        function resetApp(reason="Reset") {
+        function resetApp(reason=null) {
             doDisconnect(false, reason);
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('visible'));
             document.querySelectorAll('.mode-selector').forEach(m => m.style.display = 'flex');
@@ -334,10 +335,10 @@
             if(connectTimeout) clearTimeout(connectTimeout);
         }
 
-        // NEW: Handles seamless disconnect and UI reset
-        function disconnectAndReset() {
-            doDisconnect(true, "Call ended by YOU.");
-            setTimeout(() => resetApp("Ready for new call."), 200);
+        function disconnectAndReset(isRemote) {
+            const msg = isRemote ? "Call ended by PEER." : "Call ended by YOU.";
+            doDisconnect(!isRemote, msg);
+            setTimeout(() => resetApp(), 200); // Silent reset
         }
 
         function startAuto(role) {
@@ -366,12 +367,10 @@
                 el('btnPaste').style.display = 'block';
                 log("Selected JOIN. Waiting for code...", 'sys');
                 
-                // NEW: Auto-focus the input for Guest
                 setTimeout(() => el('roomCode').focus(), 100);
             }
         }
 
-        // NEW: Validates input on the fly
         function validateRoomInput(input) {
             input.value = input.value.toUpperCase();
             if (input.value.length === 4) {
@@ -382,7 +381,6 @@
         function connectMQTT() {
             if(!isHost) currentRoom = el('roomCode').value.toUpperCase().trim();
             
-            // NEW: Strict length check
             if(currentRoom.length !== 4) {
                 el('roomCode').classList.add('error');
                 return log("Error: Code must be 4 characters.", 'sys');
@@ -392,7 +390,6 @@
                 el('btnAutoConnect').disabled = true;
                 el('btnAutoConnect').innerText = "CONNECTING...";
                 
-                // NEW: Connection timeout
                 connectTimeout = setTimeout(() => {
                     if(!isConnected) {
                         log("Error: Peer not found. Check code.", 'sys');
@@ -402,7 +399,7 @@
                         el('btnAutoConnect').innerText = "CONNECT";
                         if(mqClient) mqClient.end();
                     }
-                }, 15000); // 15s timeout
+                }, 15000); 
             }
             
             el('mqttStatus').innerText = "Network Connected. Waiting for peer...";
@@ -421,7 +418,6 @@
                 const msg = JSON.parse(message.toString());
                 if(msg.sender === clientId) return; 
 
-                // If we get a message, clear timeout
                 if(connectTimeout) clearTimeout(connectTimeout);
 
                 if(msg.type === 'join' && isHost) {
@@ -540,7 +536,7 @@
             dc = channel;
             dc.onopen = () => { log("Secure Chat Ready.", 'sys'); setConnected(true); };
             dc.onmessage = e => {
-                if(e.data === "SYS:END") disconnectAndReset(); // If peer disconnects, we reset too
+                if(e.data === "SYS:END") disconnectAndReset(true); 
                 else log(e.data, 'peer');
             }
         }
@@ -585,7 +581,7 @@
             if (pc) pc.close();
             pc = null; dc = null;
             setConnected(false);
-            log(reason, 'sys');
+            if (reason) log(reason, 'sys'); // Only log if reason provided
         }
 
         function toggleMedia(type) {
@@ -642,12 +638,12 @@
             el('chatLog').append(d); el('chatLog').scrollTop = 9999;
         }
 
-        function copyToClip(id) { el(id).select(); document.execCommand('copy'); log("Copied to clipboard.", 'sys'); }
+        function copyToClip(id) { el(id).select(); document.execCommand('copy'); }
         async function pasteToField(id) {
             try { 
                 const text = await navigator.clipboard.readText();
                 el(id).value = text; 
-                log("Pasted from clipboard.", 'sys');
+                // Log removed
                 if(id==='joinOffer') joinCheckOffer(); 
                 if(id==='hostAnswer') validateInput(el(id));
             } catch(e){ log("Paste failed.", 'sys'); }
