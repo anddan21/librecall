@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LibreCall v0.77 (Soft UI)</title>
+    <title>LibreCall</title>
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#121212">
@@ -113,21 +113,16 @@
         .btn-blue { background: #007bff; }
         .btn-green { background: #28a745; }
         
-        /* UPDATED RED BUTTON STYLE */
         .btn-red { 
-            background: #a63a3a; /* Soft Burgundy/Brick Red */
+            background: #a63a3a; /* Soft Burgundy */
             transition: background 0.2s;
         }
         .btn-red:hover { background: #c04040; }
         
         .btn-grey { background: #444; }
 
-        /* SPECIFIC DISCONNECT BUTTON STYLE */
         #btnDisconnect {
-            height: 60px; /* Taller */
-            font-size: 18px; /* Larger Text */
-            margin-bottom: 10px; /* Spacing */
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            height: 60px; font-size: 18px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
         #chatLog {
@@ -161,7 +156,10 @@
         }
         .video-stage.visible { display: flex; }
         .placeholder { position: absolute; color: #444; font-weight: 500; }
-        .main-view { width: 100%; height: 100%; object-fit: cover; position: absolute; z-index: 1; }
+        
+        /* FIX: contain ensures full video is visible without cropping */
+        .main-view { width: 100%; height: 100%; object-fit: contain; position: absolute; z-index: 1; }
+        
         .pip-view { 
             width: 25%; aspect-ratio: 16/9; object-fit: cover; 
             position: absolute; bottom: 15px; right: 15px; z-index: 10;
@@ -183,7 +181,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.77</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.85</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -441,6 +439,11 @@
 
         async function joinGenerate() {
             createPC();
+            // Bug Fix v0.76 logic retained: Always setupDC on manual join
+            pc.ondatachannel = e => {
+                log("DataChannel received via P2P.", 'sys');
+                setupDC(e.channel);
+            };
             try {
                 const json = await decompress(el('joinOffer').value.trim());
                 await pc.setRemoteDescription(JSON.parse(json));
@@ -449,12 +452,13 @@
             } catch(e) { log("Invalid Code", 'sys'); }
         }
 
-        // --- WEBRTC ---
+        // --- WEBRTC CORE (v0.77 Logic + contain fix) ---
         function createPC() {
             if(pc) return;
             pc = new RTCPeerConnection(config);
             if(localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
             
+            // v0.76 FIX: Always listen for DataChannel!
             pc.ondatachannel = e => {
                 log("DataChannel received via P2P.", 'sys');
                 setupDC(e.channel);
@@ -585,6 +589,7 @@
 
         function doSend() {
             const v = el('chatInput').value;
+            // v0.76 FIX: check dc existence properly
             if(v && dc && dc.readyState==='open') { dc.send(v); log(v, 'me'); el('chatInput').value=''; }
             else if(v) log("Error: Chat not connected yet.", 'sys');
         }
