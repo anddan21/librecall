@@ -120,10 +120,13 @@
         
         .btn-blue { background: #007bff; }
         .btn-green { background: #28a745; }
+        
         .btn-red { background: #a63a3a; transition: background 0.2s; }
         .btn-red:hover { background: #c04040; }
+        
         .btn-grey { background: #444; }
 
+        /* HANG UP button styling */
         #btnDisconnect {
             height: 60px; font-size: 18px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
@@ -190,7 +193,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.100</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.101</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -215,7 +218,7 @@
                     <div id="mqttStatus" class="mqtt-status">Not connected</div>
                     <button id="btnAutoConnect" class="action-btn btn-green" style="margin-top:10px; display:none" onclick="connectMQTT()" disabled>CONNECT</button>
                 </div>
-                <button class="action-btn btn-grey" onclick="fullReset()">CANCEL</button>
+                <button class="action-btn btn-grey" onclick="fullReset()">RESET</button>
             </div>
         </div>
 
@@ -240,7 +243,7 @@
                     </div>
                     <button id="btnHostConnect" class="action-btn btn-green" style="margin-top:10px" onclick="hostConnectManual()" disabled>CONNECT</button>
                 </div>
-                <button class="action-btn btn-grey" onclick="fullReset()">CANCEL</button>
+                <button class="action-btn btn-grey" onclick="fullReset()">RESET</button>
             </div>
             <div id="joinPanel" class="panel">
                 <div class="step-box step-wait">
@@ -258,11 +261,11 @@
                         <button class="side-btn" onclick="copyToClip('joinAnswer')">COPY</button>
                     </div>
                 </div>
-                <button class="action-btn btn-grey" onclick="fullReset()">CANCEL</button>
+                <button class="action-btn btn-grey" onclick="fullReset()">RESET</button>
             </div>
         </div>
 
-        <button id="btnDisconnect" class="action-btn btn-red" style="display:none" onclick="disconnectAndReset(false)">DISCONNECT</button>
+        <button id="btnDisconnect" class="action-btn btn-red" style="display:none" onclick="hangUp(false)">HANG UP</button>
 
         <div id="chatLog"></div>
         <div class="chat-row">
@@ -313,7 +316,7 @@
 
         function switchTab(tab) {
             if(isConnected) return;
-            resetApp(); 
+            // Just switch tab visibility, let fullReset handle deep clean
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
             
@@ -326,30 +329,36 @@
             }
         }
 
-        function resetApp(reason=null) {
-            doDisconnect(false, reason);
-            stopMedia(); 
-            document.querySelectorAll('.panel').forEach(p => p.classList.remove('visible'));
-            document.querySelectorAll('.mode-selector').forEach(m => m.style.display = 'flex');
-            ['hostOffer','hostAnswer','joinOffer','joinAnswer','roomCode'].forEach(i => { if(el(i)) el(i).value = ''; });
-            el('mqttStatus').innerText = "Not connected";
-            el('mqttStatus').style.color = "#00bfff";
-            el('joinStep2').style.opacity = '0.5';
-            el('btnCopy').style.display = 'none';
-            el('btnPaste').style.display = 'none';
-            if(mqClient) { mqClient.end(); mqClient = null; log("MQTT Disconnected.", 'sys'); }
-            if(wakeLock) { wakeLock.release(); wakeLock = null; }
-            if(connectTimeout) clearTimeout(connectTimeout);
-        }
-
+        // RESET BUTTON -> Full Reload
         function fullReset() {
             window.location.reload();
         }
 
-        function disconnectAndReset(isRemote) {
+        // HANG UP -> Clean close, Keep history, Lock UI
+        function hangUp(isRemote) {
             const msg = isRemote ? "Call ended by PEER." : "Call ended by YOU.";
-            doDisconnect(!isRemote, msg);
-            setTimeout(() => fullReset(), 200); 
+            // Send signal if we initiated the Hang Up
+            if (!isRemote && dc?.readyState === 'open') {
+                dc.send("SYS:END");
+            }
+            doDisconnect(true, msg);
+            
+            // Post-Hangup State: Lock "Connect" buttons, force user to use RESET
+            el('btnAutoConnect').disabled = true;
+            el('btnHostConnect').disabled = true;
+            el('roomCode').disabled = true;
+            el('btnPaste').disabled = true;
+            el('mqttStatus').innerText = "Call Ended. Press RESET to start new call.";
+            el('mqttStatus').style.color = "#ff9800";
+        }
+
+        // Internal Disconnect Logic
+        function doDisconnect(notify, reason) {
+            if (pc) pc.close();
+            pc = null; dc = null;
+            stopMedia();
+            setConnected(false); // Removes .connected class -> Shows panels
+            if (reason) log(reason, 'sys'); 
         }
 
         function stopMedia() {
@@ -366,7 +375,15 @@
                 if(localStream) return true; 
                 log("Requesting media access...", 'sys');
                 localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
-                el('localVideo').srcObject = localStream;
+                
+                // VIDEO FIX: Explicit Play + LoadedMetadata
+                const lv = el('localVideo');
+                lv.srcObject = localStream;
+                lv.muted = true; // Ensure local is muted
+                lv.onloadedmetadata = () => {
+                    lv.play().catch(e => console.log("Local Play Error:", e));
+                };
+
                 localStream.getAudioTracks()[0].enabled = true; 
                 localStream.getVideoTracks()[0].enabled = false;
                 updateMediaUI();
@@ -542,13 +559,14 @@
 
             pc.ontrack = e => {
                 const v = el('remoteVideo');
-                // FIX: Check if stream changed before playing to avoid AbortError
+                // VIDEO FIX: Check stream changes & force play
                 if (v.srcObject !== e.streams[0]) {
                     v.srcObject = e.streams[0];
-                    v.play().catch(e => {
-                        // FIX: Suppress AbortError logs
-                        if (e.name !== 'AbortError') console.error(e);
-                    });
+                    v.onloadedmetadata = () => {
+                        v.play().catch(e => {
+                            if (e.name !== 'AbortError') console.error("Remote Play Error:", e);
+                        });
+                    };
                 }
             };
             
@@ -586,7 +604,7 @@
             dc = channel;
             dc.onopen = () => { log("Connection established. Happy Libre Call!", 'sys'); setConnected(true); };
             dc.onmessage = e => {
-                if(e.data === "SYS:END") disconnectAndReset(true); 
+                if(e.data === "SYS:END") hangUp(true); // Remote Hang Up
                 else log(e.data, 'peer');
             }
         }
@@ -615,14 +633,6 @@
 
         async function requestWakeLock() { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} }
         
-        function doDisconnect(notify, reason) {
-            if (notify && dc?.readyState === 'open') dc.send("SYS:END");
-            if (pc) pc.close();
-            pc = null; dc = null;
-            setConnected(false);
-            if (reason) log(reason, 'sys'); 
-        }
-
         function toggleMedia(type) {
             if(!localStream) return;
             const tr = type==='video' ? localStream.getVideoTracks()[0] : localStream.getAudioTracks()[0];
