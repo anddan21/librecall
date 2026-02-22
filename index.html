@@ -173,6 +173,32 @@
             transition: all 0.3s ease;
         }
 
+        /* --- iOS TAP TO PLAY OVERLAY --- */
+        .play-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        .play-overlay button {
+            width: auto;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 50px;
+            box-shadow: 0 4px 20px rgba(40, 167, 69, 0.5);
+            animation: pulse-btn 2s infinite;
+        }
+        @keyframes pulse-btn {
+            0% { transform: scale(1); box-shadow: 0 4px 20px rgba(40, 167, 69, 0.5); }
+            50% { transform: scale(1.05); box-shadow: 0 4px 30px rgba(40, 167, 69, 0.8); }
+            100% { transform: scale(1); box-shadow: 0 4px 20px rgba(40, 167, 69, 0.5); }
+        }
+
         @media (orientation: portrait) {
             .pip-view { width: 22%; aspect-ratio: 9/16; }
         }
@@ -193,7 +219,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.101</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.102</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -283,6 +309,10 @@
         <div class="placeholder">Waiting for Video...</div>
         <video id="remoteVideo" class="main-view" autoplay playsinline onclick="vidClick(this)"></video>
         <video id="localVideo" class="pip-view" autoplay playsinline muted onclick="vidClick(this)"></video>
+        
+        <div id="playOverlay" class="play-overlay" style="display:none;">
+            <button class="action-btn btn-green" onclick="startManualPlayback()">▶ TAP TO PLAY</button>
+        </div>
     </div>
 
     <script>
@@ -316,7 +346,6 @@
 
         function switchTab(tab) {
             if(isConnected) return;
-            // Just switch tab visibility, let fullReset handle deep clean
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
             
@@ -329,21 +358,17 @@
             }
         }
 
-        // RESET BUTTON -> Full Reload
         function fullReset() {
             window.location.reload();
         }
 
-        // HANG UP -> Clean close, Keep history, Lock UI
         function hangUp(isRemote) {
             const msg = isRemote ? "Call ended by PEER." : "Call ended by YOU.";
-            // Send signal if we initiated the Hang Up
             if (!isRemote && dc?.readyState === 'open') {
                 dc.send("SYS:END");
             }
             doDisconnect(true, msg);
             
-            // Post-Hangup State: Lock "Connect" buttons, force user to use RESET
             el('btnAutoConnect').disabled = true;
             el('btnHostConnect').disabled = true;
             el('roomCode').disabled = true;
@@ -352,12 +377,12 @@
             el('mqttStatus').style.color = "#ff9800";
         }
 
-        // Internal Disconnect Logic
         function doDisconnect(notify, reason) {
             if (pc) pc.close();
             pc = null; dc = null;
             stopMedia();
-            setConnected(false); // Removes .connected class -> Shows panels
+            setConnected(false); 
+            if(el('playOverlay')) el('playOverlay').style.display = 'none'; // Hide overlay on disconnect
             if (reason) log(reason, 'sys'); 
         }
 
@@ -376,12 +401,14 @@
                 log("Requesting media access...", 'sys');
                 localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
                 
-                // VIDEO FIX: Explicit Play + LoadedMetadata
                 const lv = el('localVideo');
                 lv.srcObject = localStream;
-                lv.muted = true; // Ensure local is muted
+                lv.muted = true; 
                 lv.onloadedmetadata = () => {
-                    lv.play().catch(e => console.log("Local Play Error:", e));
+                    let playPromise = lv.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(e => console.log("Local Play Error:", e));
+                    }
                 };
 
                 localStream.getAudioTracks()[0].enabled = true; 
@@ -559,13 +586,17 @@
 
             pc.ontrack = e => {
                 const v = el('remoteVideo');
-                // VIDEO FIX: Check stream changes & force play
                 if (v.srcObject !== e.streams[0]) {
                     v.srcObject = e.streams[0];
                     v.onloadedmetadata = () => {
-                        v.play().catch(e => {
-                            if (e.name !== 'AbortError') console.error("Remote Play Error:", e);
-                        });
+                        let playPromise = v.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(err => {
+                                // iOS / Browser Blocked Autoplay! Show the manual Play button.
+                                console.log("Autoplay blocked. User interaction required.");
+                                el('playOverlay').style.display = 'flex';
+                            });
+                        }
                     };
                 }
             };
@@ -577,6 +608,18 @@
             pc.onconnectionstatechange = () => {
                 if (pc.connectionState === 'connected') setConnected(true);
             };
+        }
+
+        // NEW: MANUAL PLAYBACK TRIGGER FOR iOS
+        function startManualPlayback() {
+            el('playOverlay').style.display = 'none';
+            const rv = el('remoteVideo');
+            const lv = el('localVideo');
+            
+            if (rv.srcObject) rv.play().catch(e => console.error("Remote Play Failed:", e));
+            if (lv.srcObject) lv.play().catch(e => console.error("Local Play Failed:", e));
+            
+            log("Media playback started manually.", 'sys');
         }
 
         async function finalizeIce() {
@@ -604,7 +647,7 @@
             dc = channel;
             dc.onopen = () => { log("Connection established. Happy Libre Call!", 'sys'); setConnected(true); };
             dc.onmessage = e => {
-                if(e.data === "SYS:END") hangUp(true); // Remote Hang Up
+                if(e.data === "SYS:END") hangUp(true); 
                 else log(e.data, 'peer');
             }
         }
