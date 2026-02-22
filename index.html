@@ -251,7 +251,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.104</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.105</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -364,6 +364,25 @@
         let iceComplete = false, wakeLock = null;
         let currentRoom = "";
         let connectTimeout = null;
+
+        // NEW: Check for deep link on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.location.hash.length === 5) {
+                const code = window.location.hash.substring(1).toUpperCase();
+                isAuto = true;
+                isHost = false;
+                el('uiAuto').querySelector('.mode-selector').style.display = 'none';
+                el('autoPanel').classList.add('visible');
+                el('roomCode').value = code;
+                el('roomCode').readOnly = false;
+                el('autoTitle').innerText = "Join Host Code";
+                el('btnAutoConnect').style.display = 'block';
+                el('btnAutoConnect').disabled = false;
+                el('btnCopy').style.display = 'none';
+                el('btnPaste').style.display = 'none';
+                log(`Link detected. Press CONNECT to join.`, 'sys');
+            }
+        });
 
         async function compress(str) {
             const stream = new Blob([str]).stream().pipeThrough(new CompressionStream("gzip"));
@@ -505,12 +524,17 @@
             }
         }
 
-        function connectMQTT() {
+        async function connectMQTT() {
             if(!isHost) currentRoom = el('roomCode').value.toUpperCase().trim();
             
             if(currentRoom.length !== 4) {
                 el('roomCode').classList.add('error');
                 return log("Error: Code must be 4 characters.", 'sys');
+            }
+
+            // NEW: Ensure media is active if triggered by the deep link CONNECT button
+            if (!localStream) {
+                if (!await initMedia()) return;
             }
 
             if(!isHost) {
@@ -777,7 +801,26 @@
             el('chatLog').append(d); el('chatLog').scrollTop = 9999;
         }
 
-        function copyToClip(id) { el(id).select(); document.execCommand('copy'); }
+        // NEW: Advanced Copy Function that generates full URL with hash
+        async function copyToClip(id) {
+            let text = el(id).value;
+            if (id === 'roomCode') {
+                text = window.location.origin + window.location.pathname + '#' + text;
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                log("Link copied to clipboard.", 'sys');
+            } catch(e) {
+                const temp = document.createElement('textarea');
+                temp.value = text;
+                document.body.appendChild(temp);
+                temp.select();
+                document.execCommand('copy');
+                document.body.removeChild(temp);
+                log("Link copied to clipboard.", 'sys');
+            }
+        }
+        
         async function pasteToField(id) {
             try { 
                 const text = await navigator.clipboard.readText();
