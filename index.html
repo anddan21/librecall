@@ -6,6 +6,40 @@
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#121212">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="LibreCall">
+
+    <script>
+        (function() {
+            // Vektor logo: Dark background, Neon Gradient Camera
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#1e1e1e"/><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00ff9d"/><stop offset="100%" stop-color="#00bfff"/></linearGradient></defs><path fill="url(#g)" d="M362.7 197.3l-50.7 38v-32.6c0-23.6-19.1-42.7-42.7-42.7H136c-23.6 0-42.7 19.1-42.7 42.7v106.7c0 23.6 19.1 42.7 42.7 42.7h133.3c23.6 0 42.7-19.1 42.7-42.7v-32.6l50.7 38c11.9 8.9 29.3.4 29.3-14.6V211.9c0-15-17.4-23.5-29.3-14.6z"/></svg>`;
+            const svgUrl = "data:image/svg+xml;base64," + btoa(svg);
+            
+            // Standard Favicon
+            const iconLink = document.createElement('link');
+            iconLink.rel = 'icon';
+            iconLink.type = 'image/svg+xml';
+            iconLink.href = svgUrl;
+            document.head.appendChild(iconLink);
+
+            // High-res Apple Touch Icon generated via hidden canvas
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                canvas.getContext('2d').drawImage(img, 0, 0);
+                const appleLink = document.createElement('link');
+                appleLink.rel = 'apple-touch-icon';
+                appleLink.href = canvas.toDataURL('image/png');
+                document.head.appendChild(appleLink);
+            };
+            img.src = svgUrl;
+        })();
+    </script>
+
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
     <style>
@@ -217,7 +251,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.103</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.104</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -409,7 +443,6 @@
                     }
                 };
 
-                // VIDEO IS NOW ON BY DEFAULT
                 localStream.getAudioTracks()[0].enabled = true; 
                 localStream.getVideoTracks()[0].enabled = true; 
                 updateMediaUI();
@@ -432,7 +465,6 @@
             requestWakeLock();
 
             if(isHost) {
-                // SAFE ALPHABET GENERATOR (No O, 0, I, 1)
                 const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
                 currentRoom = '';
                 for (let i = 0; i < 4; i++) {
