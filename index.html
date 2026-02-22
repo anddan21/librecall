@@ -251,7 +251,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.105</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.107</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -339,7 +339,7 @@
 
     <div id="videoContainer" class="video-stage">
         <div class="placeholder">Waiting for Video...</div>
-        <video id="remoteVideo" class="main-view" autoplay playsinline onclick="vidClick(this)"></video>
+        <video id="remoteVideo" class="main-view" style="display:none;" autoplay playsinline onclick="vidClick(this)"></video>
         <video id="localVideo" class="pip-view" autoplay playsinline muted onclick="vidClick(this)"></video>
         
         <div id="playOverlay" class="play-overlay" style="display:none;">
@@ -361,11 +361,10 @@
 
         let pc, dc, localStream, mqClient;
         let isHost = false, isConnected = false, isAuto = false;
-        let iceComplete = false, wakeLock = null;
+        let iceComplete = false, wakeLock = null, handshakeStarted = false;
         let currentRoom = "";
         let connectTimeout = null;
 
-        // NEW: Check for deep link on page load
         window.addEventListener('DOMContentLoaded', () => {
             if (window.location.hash.length === 5) {
                 const code = window.location.hash.substring(1).toUpperCase();
@@ -420,18 +419,22 @@
             }
             doDisconnect(true, msg);
             
-            el('btnAutoConnect').disabled = true;
-            el('btnHostConnect').disabled = true;
-            el('roomCode').disabled = true;
-            el('btnPaste').disabled = true;
-            el('mqttStatus').innerText = "Call Ended. Press RESET to start new call.";
+            el('btnAutoConnect').style.display = 'block';
+            el('btnAutoConnect').disabled = false;
+            el('btnAutoConnect').innerText = "RECONNECT";
+            el('roomCode').disabled = true; 
+            
+            el('mqttStatus').innerText = "Call Ended. Click RECONNECT to resume.";
             el('mqttStatus').style.color = "#ff9800";
         }
 
         function doDisconnect(notify, reason) {
             if (pc) pc.close();
             pc = null; dc = null;
-            stopMedia();
+            handshakeStarted = false; // Reset handshake for reconnects
+            if (mqClient) { mqClient.end(); mqClient = null; } 
+            if (connectTimeout) clearTimeout(connectTimeout);
+            stopMedia(); 
             setConnected(false); 
             if(el('playOverlay')) el('playOverlay').style.display = 'none'; 
             if (reason) log(reason, 'sys'); 
@@ -532,28 +535,40 @@
                 return log("Error: Code must be 4 characters.", 'sys');
             }
 
-            // NEW: Ensure media is active if triggered by the deep link CONNECT button
             if (!localStream) {
                 if (!await initMedia()) return;
             }
 
-            if(!isHost) {
-                el('btnAutoConnect').disabled = true;
-                el('btnAutoConnect').innerText = "CONNECTING...";
-                el('roomCode').disabled = true;  
-                el('btnPaste').disabled = true; 
-            }
+            el('btnAutoConnect').style.display = 'block'; 
+            el('btnAutoConnect').disabled = true;
+            el('btnAutoConnect').innerText = isHost ? "WAITING..." : "CONNECTING...";
+            el('roomCode').disabled = true;  
+            el('btnPaste').disabled = true; 
             
             el('mqttStatus').innerText = "Network Connected. Waiting for peer...";
+            el('mqttStatus').style.color = "#00bfff";
             
+            if (mqClient) { mqClient.end(); mqClient = null; } 
             const clientId = 'lc_' + Math.random().toString(16).substr(2, 8);
             mqClient = mqtt.connect(MQTT_BROKER, { clientId: clientId });
 
+            let isMqttFirstConnect = true;
+
             mqClient.on('connect', () => {
-                log("MQTT Connected.", 'sys');
+                if (isMqttFirstConnect) {
+                    log("MQTT Connected.", 'sys');
+                    isMqttFirstConnect = false;
+                }
                 const topic = `librecall/v1/${currentRoom}/${isHost ? 'host' : 'guest'}`;
                 mqClient.subscribe(topic);
-                if(!isHost) { publishSig('join', {}); createPC(); }
+                
+                if(!isHost) { 
+                    publishSig('join', {}); 
+                    createPC(); 
+                } else {
+                    // FIX: Host announces presence so early guests can resend join
+                    publishSig('host_ready', {}); 
+                }
             });
 
             mqClient.on('message', async (topic, message) => {
@@ -562,7 +577,14 @@
 
                 if(connectTimeout) clearTimeout(connectTimeout);
 
+                // FIX: Guest handles Host announcement
+                if(msg.type === 'host_ready' && !isHost) {
+                    if (!handshakeStarted) publishSig('join', {});
+                }
+
                 if(msg.type === 'join' && isHost) {
+                    if (handshakeStarted) return; // FIX: Ignore duplicate joins to prevent race condition loop
+                    handshakeStarted = true;
                     el('mqttStatus').innerText = "Peer found! Initializing...";
                     createPC();
                     dc = pc.createDataChannel("chat");
@@ -571,13 +593,17 @@
                     await pc.setLocalDescription(offer);
                 }
                 if(msg.type === 'offer' && !isHost) {
+                    if (handshakeStarted) return; 
+                    handshakeStarted = true;
                     el('mqttStatus').innerText = "Connecting secure tunnel...";
                     if(!pc) createPC();
                     await pc.setRemoteDescription(msg.data);
                     const answer = await pc.createAnswer();
                     await pc.setLocalDescription(answer);
                 }
-                if(msg.type === 'answer' && isHost) await pc.setRemoteDescription(msg.data);
+                if(msg.type === 'answer' && isHost) {
+                    await pc.setRemoteDescription(msg.data);
+                }
             });
              mqClient.on('error', (err) => {
                  log("MQTT Error: " + err.message, 'sys');
@@ -649,6 +675,8 @@
                 const v = el('remoteVideo');
                 if (v.srcObject !== e.streams[0]) {
                     v.srcObject = e.streams[0];
+                    v.style.display = 'block'; 
+                    
                     v.onloadedmetadata = () => {
                         let playPromise = v.play();
                         if (playPromise !== undefined) {
@@ -667,6 +695,10 @@
 
             pc.onconnectionstatechange = () => {
                 if (pc.connectionState === 'connected') setConnected(true);
+                else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+                    log("Connection lost.", "sys");
+                    hangUp(true);
+                }
             };
         }
 
@@ -729,6 +761,7 @@
                 el('chatInput').disabled = true;
                 el('btnSend').disabled = true;
                 el('remoteVideo').srcObject = null;
+                el('remoteVideo').style.display = 'none'; 
                 updateVideoVisibility();
             }
         }
@@ -801,7 +834,6 @@
             el('chatLog').append(d); el('chatLog').scrollTop = 9999;
         }
 
-        // NEW: Advanced Copy Function that generates full URL with hash
         async function copyToClip(id) {
             let text = el(id).value;
             if (id === 'roomCode') {
