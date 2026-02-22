@@ -126,7 +126,6 @@
         
         .btn-grey { background: #444; }
 
-        /* HANG UP button styling */
         #btnDisconnect {
             height: 60px; font-size: 18px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
@@ -173,7 +172,6 @@
             transition: all 0.3s ease;
         }
 
-        /* --- iOS TAP TO PLAY OVERLAY --- */
         .play-overlay {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -219,7 +217,7 @@
 </head>
 <body>
 
-    <h1>LibreCall<span class="version-tag">v0.102</span></h1>
+    <h1>LibreCall<span class="version-tag">v0.103</span></h1>
 
     <div class="controls">
         <div id="tabBar" class="tab-bar">
@@ -382,7 +380,7 @@
             pc = null; dc = null;
             stopMedia();
             setConnected(false); 
-            if(el('playOverlay')) el('playOverlay').style.display = 'none'; // Hide overlay on disconnect
+            if(el('playOverlay')) el('playOverlay').style.display = 'none'; 
             if (reason) log(reason, 'sys'); 
         }
 
@@ -411,8 +409,9 @@
                     }
                 };
 
+                // VIDEO IS NOW ON BY DEFAULT
                 localStream.getAudioTracks()[0].enabled = true; 
-                localStream.getVideoTracks()[0].enabled = false;
+                localStream.getVideoTracks()[0].enabled = true; 
                 updateMediaUI();
                 log("Media initialized.", 'sys');
                 return true;
@@ -433,7 +432,13 @@
             requestWakeLock();
 
             if(isHost) {
-                currentRoom = Math.random().toString(36).substring(2, 6).toUpperCase();
+                // SAFE ALPHABET GENERATOR (No O, 0, I, 1)
+                const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+                currentRoom = '';
+                for (let i = 0; i < 4; i++) {
+                    currentRoom += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                
                 el('roomCode').value = currentRoom;
                 el('roomCode').readOnly = true;
                 el('autoTitle').innerText = "Share this Code";
@@ -592,7 +597,6 @@
                         let playPromise = v.play();
                         if (playPromise !== undefined) {
                             playPromise.catch(err => {
-                                // iOS / Browser Blocked Autoplay! Show the manual Play button.
                                 console.log("Autoplay blocked. User interaction required.");
                                 el('playOverlay').style.display = 'flex';
                             });
@@ -610,7 +614,6 @@
             };
         }
 
-        // NEW: MANUAL PLAYBACK TRIGGER FOR iOS
         function startManualPlayback() {
             el('playOverlay').style.display = 'none';
             const rv = el('remoteVideo');
